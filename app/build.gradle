@@ -34,7 +34,7 @@ dependencies {
 
 task buildGoLibrary(type: Exec) {
     environment ([ANDROID_NDK_ROOT: android.ndkDirectory])
-    commandLine ('sh', '../build.sh')
+    commandLine ('../build.sh')
     inputs.files '../build.sh'
     outputs.dir 'src/main/jniLibs'
 }
