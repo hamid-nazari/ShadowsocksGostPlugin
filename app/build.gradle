@@ -1,11 +1,12 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 29
+    compileSdkVersion 33
+    namespace "com.github.shadowsocks.plugin.gost"
     defaultConfig {
-        applicationId "com.github.shadowsocks.plugin.gost"
+        applicationId "${android.namespace}"
         minSdkVersion 21
-        targetSdkVersion 29
+        targetSdkVersion 33
         versionCode 2111
         versionName "3.0.0-rc.0"
     }
@@ -24,6 +25,8 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+    
+    android.ndkVersion "26.2.11394342"
 }
 
 dependencies {

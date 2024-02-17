@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -e
-NDK_VERSION_IF_MISSING=r23b
+NDK_VERSION_IF_MISSING=r26c
 GOST_VERSION=3.0.0-alpha.6
 GOLANG_VERSION=1.19.2
 cd $( cd "$( dirname "$0"  )" && pwd  )
@@ -33,7 +33,7 @@ then
   IS_NDK_MISSING=$([[ ! -d $ANDROID_NDK_ROOT || -z "$(find $ANDROID_NDK_ROOT -iname "*clang" -print -quit)" ]] && echo true || echo false);
 fi
 
-if $IS_NDK_MISSING
+if $IS_NDK_MISSING && [ -d ~+/ndk ]
 then
   ANDROID_NDK_ROOT=$(find ~+/ndk -maxdepth 1 -mindepth 1 -type d -print -quit);
   IS_NDK_MISSING=$([[ ! -d $ANDROID_NDK_ROOT || -z "$(find $ANDROID_NDK_ROOT -iname "*clang" -print -quit)" ]] && echo true || echo false);
@@ -41,7 +41,7 @@ fi
 
 if $IS_NDK_MISSING
 then
-echo "No NDK could be detected, downloading ..."
+echo "No NDK could be detected, downloading version $NDK_VERSION_IF_MISSING ..."
 mkdir -p ndk
 cd ndk
 curl https://dl.google.com/android/repository/android-ndk-${NDK_VERSION_IF_MISSING}-linux.zip -L -o ndk.zip
