@@ -42,11 +42,9 @@ task buildGoLibrary(type: Exec) {
     outputs.dir 'src/main/jniLibs'
 }
 
-task cleanGoLibrary(type: Delete) {
-    delete "src/main/jniLibs"
+clean {
+    delete "${project.projectDir}/src/main/jniLibs"
 }
-
-cleanGoLibrary.shouldRunAfter clean
 
 tasks.whenTaskAdded { theTask ->
     if (theTask.name.equals("preDebugBuild") || theTask.name.equals("preReleaseBuild")) {

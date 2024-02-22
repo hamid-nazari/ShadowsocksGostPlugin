@@ -1,16 +1,21 @@
 #!/bin/bash
 
 set -e
+
 NDK_VERSION_IF_MISSING=r26c
-GOST_VERSION=3.0.0-alpha.6
-GOLANG_VERSION=1.19.2
-cd $( cd "$( dirname "$0"  )" && pwd  )
+GOLANG_VERSION=1.22.0
+
+cd $( cd "$( dirname "$0"  )" && pwd )
+
 git submodule update --init --recursive
+
 if [ ! -d build ]
 then
 mkdir build
 fi
+
 cd build
+
 if [ ! -e go ]
 then
 echo "GO was not detected, downloading ..."
@@ -19,13 +24,13 @@ cd go
 patch -p1 -r . < ../../go.patch
 cd ..
 fi
+
 export PATH=$PWD/go/bin:$PATH
 export GOROOT=$PWD/go
 echo "Current GO version: $(go version|grep -oP "\d.*")"
-if [ ! -e gost ] && [ -d ../gost ]
-then
+
+rm -rf gost
 cp -r ../gost .
-fi
 
 IS_NDK_MISSING=true
 if [ ! -z "$ANDROID_NDK_ROOT" ]
