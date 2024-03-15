@@ -1,4 +1,4 @@
-package com.github.shadowsocks.plugin.gost;
+package com.github.shadowsocks.plugin.hnzgost;
 
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;

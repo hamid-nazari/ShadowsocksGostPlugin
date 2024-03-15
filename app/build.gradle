@@ -5,7 +5,7 @@ properties.load(project.rootProject.file('local.properties').newDataInputStream(
 
 android {
     compileSdk 29
-    namespace "com.github.shadowsocks.plugin.gostss"
+    namespace "com.github.shadowsocks.plugin.hnzgost"
     defaultConfig {
         applicationId "${android.namespace}"
         minSdkVersion 23

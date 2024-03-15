@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">ShadowsocksGostPlugin</string>
+    <string name="app_name">HNZ-ShadowsocksGostPlugin</string>
     <string name="string_text_title">Gost for SS-Android</string>
     <string name="string_remind_re_enable">Press back button and click \"OK\" to save and apply changes.\nRe-enable my proxy profile in SS-Android to make changes take effect.</string>
     <string name="string_del_arg" translatable="false">-</string>

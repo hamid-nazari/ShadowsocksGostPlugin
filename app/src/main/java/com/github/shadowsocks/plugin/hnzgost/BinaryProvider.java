@@ -1,4 +1,4 @@
-package com.github.shadowsocks.plugin.gost;
+package com.github.shadowsocks.plugin.hnzgost;
 
 import android.net.Uri;
 import android.os.ParcelFileDescriptor;
@@ -29,6 +29,6 @@ public class BinaryProvider extends NativePluginProvider {
 
     @Override
     protected void populateFiles(@NotNull PathProvider provider) {
-        provider.addPath("gost-plugin", 0755);
+        provider.addPath("hnzgost-plugin", 0755);
     }
 }
