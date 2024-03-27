@@ -1,36 +1,49 @@
 #!/bin/bash
 
+[ -z "$GOLANG_VERSION" ] && GOLANG_VERSION="1.22.0"
+[ -z "$GOST_VERSION" ] && GOST_VERSION="3.0.0-nightly.20240201"
+[ -z "$ANDROID_NDK_ROOT" ] && NDK_VERSION="r26c"
+
 set -e
 
-NDK_VERSION_IF_MISSING=r26c
-GOLANG_VERSION=1.22.0
+pushd $( cd "$( dirname "$0"  )" && pwd ) > /dev/null
 
-cd $( cd "$( dirname "$0"  )" && pwd )
-
-# git submodule update --init --recursive
-
-if [ ! -d build ]
+if [ ! -d ".go_build" ]
 then
-mkdir build
+  mkdir ".go_build"
 fi
-
-cd build
+pushd ".go_build" > /dev/null
 
 if [ ! -e go ]
 then
-echo "GO was not detected, downloading ..."
-curl "https://dl.google.com/go/go$GOLANG_VERSION.linux-amd64.tar.gz" -L | tar -zx || exit $?
-cd go
-patch -p1 -r . < ../../go.patch
-cd ..
+  GOLANG_RELEASE="go${GOLANG_VERSION}.linux-amd64.tar.gz"
+  GOLANG_URL="https://dl.google.com/go/$GOLANG_RELEASE"
+  echo "GO was not detected, downloading '$GOLANG_RELEASE' ($GOLANG_URL) ..."
+  curl $GOLANG_URL -LO
+  tar -zxf $GOLANG_RELEASE || exit $?
+  pushd go > /dev/null
+  patch -p1 -r . < ../../gost/go.patch
+  popd > /dev/null
 fi
 
 export PATH=$PWD/go/bin:$PATH
 export GOROOT=$PWD/go
 echo "Current GO version: $(go version|grep -oP "\d.*")"
 
-rm -rf gost
-cp -r ../gost .
+if [ ! -e gost ]
+then
+  GOST_RELEASE="gost_v${GOST_VERSION}.tar.gz"
+  GOST_URL="https://github.com/go-gost/gost/archive/refs/tags/v${GOST_VERSION}.tar.gz"
+  echo "GOST was not detected, downloading '$GOST_RELEASE' ($GOST_URL) ..."
+  curl $GOST_URL -Lo $GOST_RELEASE
+  tar -zxf $GOST_RELEASE || exit $?
+  mv gost-* gost
+  pushd gost > /dev/null
+  patch -p1 -r . < ../../gost/gost.patch
+  popd > /dev/null
+fi
+cp -r ../gost/ssand_helper gost
+echo "GOST version: v$GOST_VERSION"
 
 IS_NDK_MISSING=true
 if [ ! -z "$ANDROID_NDK_ROOT" ]
@@ -46,20 +59,19 @@ fi
 
 if $IS_NDK_MISSING
 then
-echo "No NDK could be detected, downloading version $NDK_VERSION_IF_MISSING ..."
-mkdir -p ndk
-cd ndk
-curl https://dl.google.com/android/repository/android-ndk-${NDK_VERSION_IF_MISSING}-linux.zip -L -o ndk.zip
-unzip ndk.zip > /dev/null || exit $?
-rm -f ndk.zip
-[ ! -d android-ndk-${NDK_VERSION_IF_MISSING} ] && echo "Missing directory: android-ndk-${NDK_VERSION_IF_MISSING}" && exit 1
-export ANDROID_NDK_ROOT=$PWD/android-ndk-${NDK_VERSION_IF_MISSING}
-cd ..
+  NDK_BASE="android-ndk-${NDK_VERSION}"
+  NDK_RELEASE="${NDK_BASE}-linux.zip"
+  NDK_URL="https://dl.google.com/android/repository/$NDK_RELEASE"
+  echo "No NDK could be detected, downloading '$NDK_RELEASE' ($NDK_URL) ..."
+  curl $NDK_URL -L -O
+  unzip $NDK_RELEASE > /dev/null || exit $?
+  pushd $NDK_BASE > /dev/null
+  export ANDROID_NDK_ROOT=$PWD
+  popd > /dev/null
 fi
-
 echo "Android NDK root: $ANDROID_NDK_ROOT"
 
-cd gost
+pushd gost > /dev/null
 
 src="./cmd/gost";
 latest_mod=$(find $src -mindepth 1 -type f -printf '%T@\n' | sort -k1,1nr | head -1);
@@ -102,7 +114,6 @@ CC_=$(find $ANDROID_NDK_ROOT -iname "*i686-linux-android21-clang" -print -quit);
 #&& CC=$CC_ GOOS="android" GOARCH=$GOARCH_ CGO_ENABLED="1" go build -buildvcs=false -ldflags "-s -w" -a -o $output $src;
 
 duration=$(( $SECONDS - $start ))
-
 echo " + Finished: $(date) [Took $duration seconds]"
 
 exit 0;
