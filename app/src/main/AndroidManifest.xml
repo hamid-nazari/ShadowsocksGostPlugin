@@ -7,9 +7,10 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:extractNativeLibs="true">
+        android:extractNativeLibs="true"
+        android:installLocation="internalOnly">
         <activity
-            android:name=".ConfigActivity"
+            android:name="com.github.shadowsocks.plugin.hnzgost.ConfigActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="com.github.shadowsocks.plugin.ACTION_CONFIGURE"/>
@@ -21,9 +22,10 @@
         </activity>
 
         <provider
-            android:name=".BinaryProvider"
+            android:name="com.github.shadowsocks.plugin.hnzgost.BinaryProvider"
             android:authorities="com.github.shadowsocks.plugin.hnzgost.BinaryProvider"
-            android:exported="true">
+            android:exported="true"
+            android:directBootAware="true">
             <intent-filter>
                 <action android:name="com.github.shadowsocks.plugin.ACTION_NATIVE_PLUGIN" />
             </intent-filter>

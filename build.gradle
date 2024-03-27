@@ -22,6 +22,6 @@ allprojects {
 }
 
 task clean(type: Delete) {
-    delete "${rootProject.buildDir}/gost"
+    delete "${rootProject.buildDir}/hnzgost"
     delete "${rootProject.buildDir}/intermediates"
 }

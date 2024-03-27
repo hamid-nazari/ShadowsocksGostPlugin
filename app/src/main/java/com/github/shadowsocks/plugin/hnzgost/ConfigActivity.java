@@ -11,6 +11,7 @@ import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Debug;
 import android.os.Handler;
 import android.text.Editable;
 import android.util.Log;
@@ -41,6 +42,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -529,7 +531,12 @@ public class ConfigActivity extends ConfigurationActivity {
 
         // (not UI, but also saved here) save app data directory path
         File dataDir = new ContextWrapper(getApplicationContext()).getFilesDir();
-        if (!dataDir.exists() && !dataDir.mkdirs()) {
+        // HNZ: Replacing plugin package FQN with that of the ShadowSocks so that native GOST helper would not be coupled to changes
+        Uri referrer = getReferrer();
+        if(referrer != null && referrer.getHost() != null) {
+            dataDir = new File(dataDir.getAbsolutePath().replace(getPackageName(), referrer.getHost()));
+        }
+        if (!dataDir.exists() && referrer == null && !dataDir.mkdirs()) {
             Log.e("ConfigActivity", "dataDir.mkdirs() failed");
         }
         this.decodedPluginOptions.put("DataDir", dataDir.getAbsolutePath());

@@ -1,0 +1,30 @@
+diff --git a/cmd/gost/main.go b/cmd/gost/main.go
+index d3a5a42..4ea35a1 100644
+--- a/cmd/gost/main.go
++++ b/cmd/gost/main.go
+@@ -13,6 +13,7 @@ import (
+ 	"sync"
+ 
+ 	"github.com/go-gost/core/logger"
++	helper "github.com/go-gost/gost/ssand_helper"
+ 	xlogger "github.com/go-gost/x/logger"
+ 	"github.com/judwhite/go-svc"
+ )
+@@ -72,6 +73,8 @@ func worker(id int, args []string, ctx *context.Context, ret *int) {
+ func init() {
+ 	var printVersion bool
+ 
++	helper.PreInit()
++
+ 	flag.Var(&services, "L", "service list")
+ 	flag.Var(&nodes, "F", "chain node list")
+ 	flag.StringVar(&cfgFile, "C", "", "configuration file")
+@@ -88,6 +91,8 @@ func init() {
+ 		os.Exit(0)
+ 	}
+ 
++	helper.PostInit()
++
+ 	logger.SetDefault(xlogger.NewLogger())
+ }
+ 

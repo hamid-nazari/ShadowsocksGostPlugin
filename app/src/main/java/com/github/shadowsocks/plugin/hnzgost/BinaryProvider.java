@@ -1,16 +1,19 @@
 package com.github.shadowsocks.plugin.hnzgost;
 
 import android.net.Uri;
+import android.os.Debug;
 import android.os.ParcelFileDescriptor;
 import com.github.shadowsocks.plugin.NativePluginProvider;
 import com.github.shadowsocks.plugin.PathProvider;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.Console;
 import java.io.File;
 import java.io.FileNotFoundException;
 
 public class BinaryProvider extends NativePluginProvider {
+
     @NotNull
     @Override
     public ParcelFileDescriptor openFile(@Nullable Uri uri) {
@@ -29,6 +32,6 @@ public class BinaryProvider extends NativePluginProvider {
 
     @Override
     protected void populateFiles(@NotNull PathProvider provider) {
-        provider.addPath("hnzgost-plugin", 0755);
+        provider.addPath("libgost-plugin", 0755);
     }
 }
