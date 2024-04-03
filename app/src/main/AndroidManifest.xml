@@ -3,44 +3,44 @@
 
     <application
         android:allowBackup="true"
+        android:extractNativeLibs="true"
         android:icon="@mipmap/ic_launcher"
+        android:installLocation="internalOnly"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:supportsRtl="true"
-        android:extractNativeLibs="true"
-        android:installLocation="internalOnly">
+        android:supportsRtl="true">
         <activity
-            android:name="com.github.shadowsocks.plugin.hnzgost.ConfigActivity"
+            android:name=".ConfigurationActivity"
             android:exported="true">
             <intent-filter>
-                <action android:name="com.github.shadowsocks.plugin.ACTION_CONFIGURE"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-                <data android:scheme="plugin"
+                <action android:name="com.github.shadowsocks.plugin.ACTION_CONFIGURE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data
                     android:host="com.github.shadowsocks"
-                    android:path="/hnzgost"/>
+                    android:path="/${pluginID}"
+                    android:scheme="plugin" />
             </intent-filter>
         </activity>
 
         <provider
-            android:name="com.github.shadowsocks.plugin.hnzgost.BinaryProvider"
-            android:authorities="com.github.shadowsocks.plugin.hnzgost.BinaryProvider"
-            android:exported="true"
-            android:directBootAware="true">
+            android:name=".NativeProvider"
+            android:authorities="com.github.shadowsocks.plugin.gost.NativeProvider"
+            android:directBootAware="true"
+            android:exported="true">
             <intent-filter>
                 <action android:name="com.github.shadowsocks.plugin.ACTION_NATIVE_PLUGIN" />
             </intent-filter>
             <intent-filter>
                 <action android:name="com.github.shadowsocks.plugin.ACTION_NATIVE_PLUGIN" />
-
                 <data
                     android:host="com.github.shadowsocks"
-                    android:path="/hnzgost"
+                    android:path="/${pluginID}"
                     android:scheme="plugin" />
             </intent-filter>
 
             <meta-data
                 android:name="com.github.shadowsocks.plugin.id"
-                android:value="hnzgost" />
+                android:value="${pluginID}" />
         </provider>
     </application>
 

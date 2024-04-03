@@ -1,4 +1,4 @@
-package ssand_helper
+package gost_helper
 
 /*
 #include <stdlib.h>
@@ -72,20 +72,35 @@ import (
 	"log"
 	"net"
 	"os"
+	"runtime"
 	"strings"
 	"syscall"
 )
 
-const DEFAULT_SOCKET_PATH = "protect_path"
-const GOST_FILES_PATH = "hnzgost_files"
+const DIRECT_SOCKET_PATH = "protect_path"
+const GOST_FILES_PATH = "gost_files"
 const DEFAULT_DNS_SERVER = "8.8.8.8:53"
+
+const VAR_LOCAL_HOST = "SS_LOCAL_HOST"
+const VAR_LOCAL_PORT = "SS_LOCAL_PORT"
+const VAR_REMOTE_HOST = "SS_REMOTE_HOST"
+const VAR_REMOTE_PORT = "SS_REMOTE_PORT"
+const VAR_PLUGIN_OPTIONS = "SS_PLUGIN_OPTIONS"
+
+const PO_ENCODED = "encoded="
+const PO_VPN_MODE = "__android_vpn="
+
+const FILE_NAME_CONFIG = "config.yaml"
 
 const KEY_LEGACY_HOST = "#SS_HOST"
 const KEY_LEGACY_PORT = "#SS_PORT"
-const KEY_LOCAL_HOST = "#SS_LOCAL_HOST"
-const KEY_LOCAL_PORT = "#SS_LOCAL_PORT"
-const KEY_REMOTE_HOST = "#SS_REMOTE_HOST"
-const KEY_REMOTE_PORT = "#SS_REMOTE_PORT"
+const KEY_LOCAL_HOST = "${local.host}"
+const KEY_LOCAL_PORT = "${local.port}"
+const KEY_REMOTE_HOST = "${remote.host}"
+const KEY_REMOTE_PORT = "${remote.port}"
+
+const CONFIG_LOG_ENTRY = "log:"
+const CONFIG_NO_LOG = "\nlog:\n   level: info\n   format: json\n   output: none\n"
 
 type ConfigData struct {
 	CmdArgs   [][]string
@@ -97,8 +112,9 @@ type ConfigData struct {
 var (
 	validUsage bool
 	VPN        bool
-	SocketPath string
-	config     ConfigData
+	socketPath string
+	configData ConfigData
+	Version    string
 )
 
 func ControlOnConnSetup(network string, address string, connection syscall.RawConn) error {
@@ -114,7 +130,7 @@ func ControlOnConnSetup(network string, address string, connection syscall.RawCo
 
 		C.set_timeout(C.int(socket))
 
-		err = syscall.Connect(socket, &syscall.SockaddrUnix{Name: SocketPath})
+		err = syscall.Connect(socket, &syscall.SockaddrUnix{Name: socketPath})
 		if err != nil {
 			log.Println(err)
 			return
@@ -129,7 +145,7 @@ func ControlOnConnSetup(network string, address string, connection syscall.RawCo
 			return
 		}
 		if n != 1 {
-			log.Println("Failed to protect fd: ", fd)
+			log.Println("Failed to protect file descriptor: ", fd)
 			return
 		}
 	}
@@ -149,42 +165,45 @@ func PreInit() {
 		log.Fatal("Can't obtain current working directory: ", err)
 	}
 
-	SocketPath = PWD + "/" + DEFAULT_SOCKET_PATH
+	socketPath = PWD + "/" + DIRECT_SOCKET_PATH
 
-	localHost := os.Getenv("SS_LOCAL_HOST")
-	localPort := os.Getenv("SS_LOCAL_PORT")
-	remoteHost := os.Getenv("SS_REMOTE_HOST")
-	remotePort := os.Getenv("SS_REMOTE_PORT")
-	pluginOptions := os.Getenv("SS_PLUGIN_OPTIONS")
+	localHost := os.Getenv(VAR_LOCAL_HOST)
+	localPort := os.Getenv(VAR_LOCAL_PORT)
+	remoteHost := os.Getenv(VAR_REMOTE_HOST)
+	remotePort := os.Getenv(VAR_REMOTE_PORT)
+	pluginOptions := os.Getenv(VAR_PLUGIN_OPTIONS)
+
+	var hasLogConfig bool
+	var dataDir string
 
 	splitted := strings.Split(pluginOptions, ";")
 	encoded := ""
 	for _, subString := range splitted {
-		if strings.HasPrefix(subString, "__android_vpn=") {
+		if strings.HasPrefix(subString, PO_VPN_MODE) {
 			VPN = true
 			continue
 		}
-		if strings.HasPrefix(subString, "CFGBLOB=") {
-			encoded = subString[len("CFGBLOB="):]
+		if strings.HasPrefix(subString, PO_ENCODED) {
+			encoded = subString[len(PO_ENCODED):]
 			continue
 		}
 	}
 	if encoded != "" {
-		jsonBytes, err := base64.StdEncoding.WithPadding('_').DecodeString(encoded)
+		jsonBytes, err := base64.RawStdEncoding.DecodeString(encoded)
 		if err != nil {
-			log.Fatal("Base64 decode error: ", err)
+			log.Fatal("Base64 decoding error: ", err)
 		}
-		err = json.Unmarshal([]byte(jsonBytes), &config)
+		err = json.Unmarshal([]byte(jsonBytes), &configData)
 		if err != nil {
 			log.Fatal("JSON unmarshal error: ", err)
 		}
-		for _, args := range config.CmdArgs {
+		for _, args := range configData.CmdArgs {
 			for _, arg := range args {
 				if strings.HasPrefix(arg, "\"") && strings.HasSuffix(arg, "\"") {
 					arg = arg[1:(len(arg) - 2)]
 				}
-				arg = strings.ReplaceAll(arg, "#SS_HOST", KEY_REMOTE_HOST)
-				arg = strings.ReplaceAll(arg, "#SS_PORT", KEY_REMOTE_PORT)
+				arg = strings.ReplaceAll(arg, KEY_LEGACY_HOST, KEY_REMOTE_HOST)
+				arg = strings.ReplaceAll(arg, KEY_LEGACY_PORT, KEY_REMOTE_PORT)
 				arg = strings.ReplaceAll(arg, KEY_REMOTE_HOST, remoteHost)
 				arg = strings.ReplaceAll(arg, KEY_REMOTE_PORT, remotePort)
 				arg = strings.ReplaceAll(arg, KEY_LOCAL_HOST, localHost)
@@ -192,7 +211,7 @@ func PreInit() {
 				os.Args = append(os.Args, arg)
 			}
 		}
-		dataDir := config.DataDir + "/" + GOST_FILES_PATH
+		dataDir = configData.DataDir + "/" + GOST_FILES_PATH
 		os.MkdirAll(dataDir, 0700)
 		err = os.Chdir(dataDir)
 		if err != nil {
@@ -208,25 +227,41 @@ func PreInit() {
 				fmt.Fprintf(os.Stderr, "Can't remove an existing file '%s': %v", dirEntry.Name(), err)
 			}
 		}
-		for fileName, fileData := range config.Files {
+		for fileName, fileData := range configData.Files {
+			if strings.EqualFold(fileName, FILE_NAME_CONFIG) && strings.Contains(fileData, CONFIG_LOG_ENTRY) {
+				hasLogConfig = true
+			}
 			err = os.WriteFile(fileName, []byte(fileData), 0600)
 			if err != nil {
 				log.Fatalf("Can't write GOST file '%s': %v", fileName, err)
 			}
 		}
 	} else {
-		config = ConfigData{}
+		configData = ConfigData{}
+		dataDir = PWD
 
-		pluginOptions = strings.ReplaceAll(pluginOptions, "#SS_HOST", remoteHost)
-		pluginOptions = strings.ReplaceAll(pluginOptions, "#SS_PORT", remotePort)
+		pluginOptions = strings.ReplaceAll(pluginOptions, KEY_LEGACY_HOST, remoteHost)
+		pluginOptions = strings.ReplaceAll(pluginOptions, KEY_LEGACY_PORT, remotePort)
 
 		os.Args = append(os.Args, "-L")
 		os.Args = append(os.Args, fmt.Sprintf("ss+tcp://none@[%s]:%s", localHost, localPort))
 		os.Args = append(os.Args, strings.Split(pluginOptions, ";")...)
 	}
 
-	if config.DNSServer == "" {
-		config.DNSServer = DEFAULT_DNS_SERVER
+	// This is to make sure config.yaml is always included (even if it is empty) and logging is either configured by user or is off
+	if !hasLogConfig {
+		fConfig, err := os.OpenFile(FILE_NAME_CONFIG, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err == nil {
+			fConfig.WriteString(CONFIG_NO_LOG)
+			fConfig.Close()
+		}
+	}
+
+	os.Args = append(os.Args, "-C")
+	os.Args = append(os.Args, dataDir+"/"+FILE_NAME_CONFIG)
+
+	if configData.DNSServer == "" {
+		configData.DNSServer = DEFAULT_DNS_SERVER
 	}
 
 	validUsage = localHost != "" && localPort != ""
@@ -239,13 +274,14 @@ func PostInit() {
 	}
 
 	log.Printf("ShadowSocks Android Helper for GOST")
-	log.Printf(" - Direct Socket: %s", SocketPath)
-	log.Printf(" - DNS: %s", config.DNSServer)
+	log.Printf(" - GOST: v%s (%s %s/%s)", Version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
+	log.Printf(" - Direct Socket: %s", socketPath)
+	log.Printf(" - DNS: %s", configData.DNSServer)
 	log.Printf(" - VPN: %v", VPN)
 
 	net.DefaultResolver = &net.Resolver{Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 		dialer := net.Dialer{}
-		return dialer.DialContext(ctx, network, config.DNSServer)
+		return dialer.DialContext(ctx, network, configData.DNSServer)
 	}, PreferGo: true}
 
 	if VPN {

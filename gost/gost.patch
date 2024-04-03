@@ -6,14 +6,15 @@ index d3a5a42..4ea35a1 100644
  	"sync"
  
  	"github.com/go-gost/core/logger"
-+	helper "github.com/go-gost/gost/ssand_helper"
++	helper "github.com/go-gost/gost/gost_helper"
  	xlogger "github.com/go-gost/x/logger"
  	"github.com/judwhite/go-svc"
  )
-@@ -72,6 +73,8 @@ func worker(id int, args []string, ctx *context.Context, ret *int) {
+@@ -72,6 +73,9 @@ func worker(id int, args []string, ctx *context.Context, ret *int) {
  func init() {
  	var printVersion bool
- 
+
++	helper.Version = version
 +	helper.PreInit()
 +
  	flag.Var(&services, "L", "service list")

@@ -1,4 +1,4 @@
-package com.github.shadowsocks.plugin.hnzgost;
+package com.github.shadowsocks.plugin.gost;
 
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
@@ -11,7 +11,6 @@ import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Debug;
 import android.os.Handler;
 import android.text.Editable;
 import android.util.Log;
@@ -29,9 +28,9 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.github.shadowsocks.plugin.ConfigurationActivity;
 import com.github.shadowsocks.plugin.PluginOptions;
 
+import org.apache.commons.lang3.function.FailableRunnable;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -42,8 +41,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -51,7 +50,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-public class ConfigActivity extends ConfigurationActivity {
+public class ConfigurationActivity extends com.github.shadowsocks.plugin.ConfigurationActivity {
+    public static final String OPTION_KEY_ENCODED = "encoded";
+
     private LinearLayout linearlayout_cmdargs;
     private LinearLayout linearlayout_files;
     private Spinner argumentCountSpinner;
@@ -75,6 +76,7 @@ public class ConfigActivity extends ConfigurationActivity {
         savedInstanceState.putBoolean("onceAnsweredConfigMigrationPrompt", this.onceAnsweredConfigMigrationPrompt);
         super.onSaveInstanceState(savedInstanceState);
     }
+
     @Override
     public void onRestoreInstanceState(@NonNull Bundle savedInstanceState) {
         super.onRestoreInstanceState(savedInstanceState);
@@ -112,13 +114,14 @@ public class ConfigActivity extends ConfigurationActivity {
             }
         });
     }
+
     @Override
     protected void onInitializePluginOptions(@NonNull PluginOptions pluginOptions) {
         this.pluginOptions = pluginOptions;
 
-        String encodedPluginOptions = pluginOptions.get("CFGBLOB");
+        String encodedPluginOptions = pluginOptions.get(OPTION_KEY_ENCODED);
         if (encodedPluginOptions == null || encodedPluginOptions.length() == 0) {
-            // no CFGBLOB
+            // no encoded config
             this.decodedPluginOptions = new JSONObject();
 
             // populate things to UI
@@ -141,31 +144,30 @@ public class ConfigActivity extends ConfigurationActivity {
                 // nothing here, just empty
                 showToast(R.string.empty_config);
             } else {
-                // found old style cmdline options, prompt to migrate to CFGBLOB
+                // found old style cmdline options, prompt to migrate to encoded config
                 promptConfigMigration();
             }
         } else {
-            // has CFGBLOB, ignoring other keys
-            Base64 base64 = new Base64();
+            // has encoded config, ignoring other keys
             try {
-                base64.setPaddingChar('_');
-                String json = new String(base64.decode(encodedPluginOptions), StandardCharsets.UTF_8);
-                this.decodedPluginOptions = new JSONObject(json);
+                this.decodedPluginOptions = new JSONObject(new String(Base64.getDecoder().decode(encodedPluginOptions), StandardCharsets.UTF_8));
 
                 populateUI();
 
-                showToast(R.string.loaded_cfgblob);
+                showToast(R.string.loaded_encoded_config);
             } catch (Exception e) {
                 e.printStackTrace();
                 this.decodedPluginOptions = new JSONObject();
-                showToast(R.string.err_loading_cfgblob);
+                showToast(R.string.err_loading_encoded_config);
                 fallbackToManualEditor();
             }
         }
     }
+
     private AlertDialog configMigrationDialog;
     private boolean onceAskedForConfigMigration = false;
     private boolean onceAnsweredConfigMigrationPrompt = false;
+
     private void promptConfigMigration() {
         onceAskedForConfigMigration = true;
         if (configMigrationDialog == null) {
@@ -201,10 +203,9 @@ public class ConfigActivity extends ConfigurationActivity {
                                 next = substrings.get(i + 1);
                             if (
                                     s.matches("^-[A-Za-z0-1]$")
-                                    && next != null
-                                    && !next.matches("^-[A-Za-z0-1]$")
-                               )
-                            {
+                                            && next != null
+                                            && !next.matches("^-[A-Za-z0-1]$")
+                            ) {
                                 addCmdArg(s, next, allowDelete, false);
                                 i++;
                             } else {
@@ -294,6 +295,7 @@ public class ConfigActivity extends ConfigurationActivity {
         });
         builder.create().show();
     }
+
     private void addCmdArg(String arg1, String arg2, boolean allowDelete, boolean hideFirstArg) {
         final ViewGroup parent = this.linearlayout_cmdargs;
         LayoutInflater inflater = (LayoutInflater) getSystemService(Context.LAYOUT_INFLATER_SERVICE);
@@ -353,6 +355,7 @@ public class ConfigActivity extends ConfigurationActivity {
         });
         builder.create().show();
     }
+
     private void addFileEntry(final String fileName, final String fileData, String hint, boolean isDeletable) {
         final ViewGroup parent = this.linearlayout_files;
         LayoutInflater inflater = (LayoutInflater) getSystemService(Context.LAYOUT_INFLATER_SERVICE);
@@ -394,6 +397,7 @@ public class ConfigActivity extends ConfigurationActivity {
 
     private static final int READ_FROM_FILE = 1;
     private String openingFileName = "";
+
     private void readFromFile(String openingFileName) {
         if (readFileThread != null && readFileThread.isAlive()) {
             showToast(R.string.still_reading);
@@ -414,20 +418,19 @@ public class ConfigActivity extends ConfigurationActivity {
     }
 
     private Thread readFileThread;
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         if (requestCode == READ_FROM_FILE) {
             if (data != null) {
                 final Uri uri = data.getData();
                 final ContentResolver resolver = this.getContentResolver();
-                if (readFileThread == null || !readFileThread.isAlive()) {
-                    readFileThread = new Thread() {
-                        @Override
-                        public void run() {
-                            try {
-                                StringBuilder stringBuilder = new StringBuilder();
-                                InputStream inputStream = resolver.openInputStream(uri);
-                                BufferedReader reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(inputStream)));
+                if (uri != null && (readFileThread == null || !readFileThread.isAlive())) {
+                    readFileThread = new Thread(() -> {
+                        try {
+                            StringBuilder stringBuilder = new StringBuilder();
+                            try(InputStream inputStream = resolver.openInputStream(uri);
+                            BufferedReader reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(inputStream)));) {
                                 char[] buf = new char[4096];
                                 for (int r, t = 0; (r = reader.read(buf)) != -1; t += r) {
                                     if (t > 1024 * 1024) {
@@ -436,20 +439,18 @@ public class ConfigActivity extends ConfigurationActivity {
                                     }
                                     stringBuilder.append(buf, 0, r);
                                 }
-                                final String result = stringBuilder.toString();
-                                runOnUiThread(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        Editable editable = fileDataMap.get(openingFileName);
-                                        if (editable != null) {
-                                            editable.clear();
-                                            editable.append(result);
-                                        }
-                                    }
-                                });
-                            } catch (IOException ignored) {}
+                            }
+                            final String result = stringBuilder.toString();
+                            runOnUiThread(() -> {
+                                Editable editable = fileDataMap.get(openingFileName);
+                                if (editable != null) {
+                                    editable.clear();
+                                    editable.append(result);
+                                }
+                            });
+                        } catch (IOException ignored) {
                         }
-                    };
+                    });
                     readFileThread.start();
                 } else Log.e("ConfigActivity", "readFileThread is unexpectedly alive");
             }
@@ -533,7 +534,7 @@ public class ConfigActivity extends ConfigurationActivity {
         File dataDir = new ContextWrapper(getApplicationContext()).getFilesDir();
         // HNZ: Replacing plugin package FQN with that of the ShadowSocks so that native GOST helper would not be coupled to changes
         Uri referrer = getReferrer();
-        if(referrer != null && referrer.getHost() != null) {
+        if (referrer != null && referrer.getHost() != null) {
             dataDir = new File(dataDir.getAbsolutePath().replace(getPackageName(), referrer.getHost()));
         }
         if (!dataDir.exists() && referrer == null && !dataDir.mkdirs()) {
@@ -541,6 +542,7 @@ public class ConfigActivity extends ConfigurationActivity {
         }
         this.decodedPluginOptions.put("DataDir", dataDir.getAbsolutePath());
     }
+
     private void populateUI() throws JSONException {
         // populate linearlayout_cmdargs
         JSONArray array = this.decodedPluginOptions.getJSONArray("CmdArgs");
@@ -569,7 +571,8 @@ public class ConfigActivity extends ConfigurationActivity {
         JSONObject jsonObject = new JSONObject();
         try {
             jsonObject = this.decodedPluginOptions.getJSONObject("Files");
-        } catch (JSONException ignored) {}
+        } catch (JSONException ignored) {
+        }
         // ensure that every file name in fileNameList exist in jsonObject
         for (String fileName : fileNameList) {
             if (jsonObject.has(fileName)) {
@@ -577,7 +580,8 @@ public class ConfigActivity extends ConfigurationActivity {
             } else try {
                 jsonObject.getString(fileName);
                 continue;
-            } catch (JSONException ignored) {}
+            } catch (JSONException ignored) {
+            }
             jsonObject.put(fileName, "");
         }
         // add files in fileNameList first
@@ -601,7 +605,8 @@ public class ConfigActivity extends ConfigurationActivity {
         String dnsServer = "";
         try {
             dnsServer = this.decodedPluginOptions.getString("DNSServer");
-        } catch (JSONException ignored) {}
+        } catch (JSONException ignored) {
+        }
         if (dnsServer.length() == 0) {
             dnsServer = getString(R.string.example_dns_server);
         }
@@ -612,9 +617,11 @@ public class ConfigActivity extends ConfigurationActivity {
         String legacyCfg = "";
         try {
             legacyCfg = this.decodedPluginOptions.getString("LegacyCfg");
-        } catch (JSONException ignored) {}
+        } catch (JSONException ignored) {
+        }
         this.populateLegacyCfg(legacyCfg);
     }
+
     private void populateLegacyCfg(String legacyCfg) {
         boolean hasLegacyCfg = legacyCfg != null && legacyCfg.length() > 0;
         Button button_revert_to_legacy_config = findViewById(R.id.button_revert_to_legacy_config);
@@ -628,6 +635,7 @@ public class ConfigActivity extends ConfigurationActivity {
     }
 
     private Handler handler;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -693,19 +701,14 @@ public class ConfigActivity extends ConfigurationActivity {
                 String msg = getString(R.string.confirm_revert_to_legacy_config_msg);
                 String positiveButton = getString(R.string.ok);
                 String negativeButton = getString(R.string.cancel);
-                RunnableEx positive = new RunnableEx() {
-                    @Override
-                    public void run() {
-                        EditText editText_legacyCfg = findViewById(R.id.editText_legacyCfg);
-                        String legacyCfg = editText_legacyCfg.getText().toString();
-                        saveChanges(new PluginOptions(legacyCfg));
-                        finish();
-                    }
+                FailableRunnable<Exception> positive = () -> {
+                    EditText editText_legacyCfg = findViewById(R.id.editText_legacyCfg);
+                    String legacyCfg = editText_legacyCfg.getText().toString();
+                    saveChanges(new PluginOptions(legacyCfg));
+                    finish();
                 };
-                Runnable negative = new Runnable() {
-                    @Override
-                    public void run() {
-                    }
+
+                Runnable negative = () -> {
                 };
                 String toastMsgOnSuccess = getString(R.string.reverted_to_legacy_config);
                 String toastMsgOnFail = getString(R.string.error_reverting_to_legacy_config);
@@ -722,40 +725,29 @@ public class ConfigActivity extends ConfigurationActivity {
         String msg = getString(R.string.confirm_save_apply_msg);
         String positiveButton = getString(R.string.ok);
         String negativeButton = getString(R.string.discard_changes);
-        RunnableEx positive = new RunnableEx() {
-            @Override
-            public void run() throws JSONException, Base64.Base64Exception {
-                saveUI();
+        FailableRunnable<Exception> positive = () -> {
+            saveUI();
 
-                String json = decodedPluginOptions.toString();
-                Base64 base64 = new Base64();
-                base64.setPaddingChar('_');
-                String encodedPluginOptions = base64.encode(json.getBytes(StandardCharsets.UTF_8));
-                pluginOptions.clear(); // discard keys other than CFGBLOB
-                pluginOptions.put("CFGBLOB", encodedPluginOptions);
-                saveChanges(pluginOptions);
-                finish();
-            }
+            pluginOptions.clear(); // discard keys other than encoded config
+            pluginOptions.put(OPTION_KEY_ENCODED, Base64.getEncoder().withoutPadding().encodeToString(decodedPluginOptions.toString().getBytes(StandardCharsets.UTF_8)));
+            saveChanges(pluginOptions);
+            finish();
         };
-        Runnable negative = new Runnable() {
-            @Override
-            public void run() {
-                finish();
-            }
-        };
-        String toastMsgOnSuccess = getString(R.string.saved_cfgblob);
-        String toastMsgOnFail = getString(R.string.error_saving_cfgblob);
+        Runnable negative = this::finish;
+        String toastMsgOnSuccess = getString(R.string.saved_encoded_config);
+        String toastMsgOnFail = getString(R.string.error_saving_encoded_config);
         String toastMsgOnCancel = getString(R.string.cancelled);
         askForConsent(title, msg, positiveButton, negativeButton, positive, negative, toastMsgOnSuccess, toastMsgOnFail, toastMsgOnCancel);
     }
 
     private boolean dismissedConsent = false;
+
     private void askForConsent(
+
             String title, String msg,
             String positiveButton, String negativeButton,
-            final RunnableEx positive, final Runnable negative,
-            final String toastMsgOnSuccess, final String toastMsgOnFail, final String toastMsgOnCancel)
-    {
+            final FailableRunnable<Exception> positive, final Runnable negative,
+            final String toastMsgOnSuccess, final String toastMsgOnFail, final String toastMsgOnCancel) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(title);
         builder.setMessage(msg);

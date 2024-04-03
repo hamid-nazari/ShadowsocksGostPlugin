@@ -38,11 +38,18 @@ then
   curl $GOST_URL -Lo $GOST_RELEASE
   tar -zxf $GOST_RELEASE || exit $?
   mv gost-* gost
+fi
+
+latest_local_mod=$(find "../gost" -mindepth 1 -type f -printf '%T@\n' | sort -k1,1nr | head -1);
+latest_gost_release_mod=$(find "gost" -mindepth 1 -type f -printf '%T@\n' | sort -k1,1nr | head -1);
+if [[ $latest_local_mod > $latest_gost_release_mod ]] 
+then
   pushd gost > /dev/null
-  patch -p1 -r . < ../../gost/gost.patch
+  patch --no-backup-if-mismatch -tlNp1 -r /tmp/rejects.txt < ../../gost/gost.patch || echo "GOST patching failed (already patched?)"
+  cp -r ../../gost/gost_helper .
+  echo " + GOST patched"
   popd > /dev/null
 fi
-cp -r ../gost/ssand_helper gost
 echo "GOST version: v$GOST_VERSION"
 
 IS_NDK_MISSING=true
@@ -74,7 +81,7 @@ echo "Android NDK root: $ANDROID_NDK_ROOT"
 pushd gost > /dev/null
 
 src="./cmd/gost";
-latest_mod=$(find $src -mindepth 1 -type f -printf '%T@\n' | sort -k1,1nr | head -1);
+latest_mod=$(find $src "gost_helper" -mindepth 1 -type f -printf '%T@\n' | sort -k1,1nr | head -1);
 
 echo "Building native GO modules"
 echo " + Started: $(date)"

@@ -1,18 +1,23 @@
-package com.github.shadowsocks.plugin.hnzgost;
+package com.github.shadowsocks.plugin.gost;
 
 import android.net.Uri;
-import android.os.Debug;
 import android.os.ParcelFileDescriptor;
 import com.github.shadowsocks.plugin.NativePluginProvider;
 import com.github.shadowsocks.plugin.PathProvider;
+
+import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.Console;
 import java.io.File;
 import java.io.FileNotFoundException;
 
-public class BinaryProvider extends NativePluginProvider {
+public class NativeProvider extends NativePluginProvider {
+
+    @NonNls
+    public static final String NATIVE_PLUGIN_NAME = "libgost-plugin.so";
+    @NonNls
+    public static final String NATIVE_PATH = "gost_ssand_files";
 
     @NotNull
     @Override
@@ -27,11 +32,11 @@ public class BinaryProvider extends NativePluginProvider {
     @NotNull
     @Override
     public String getExecutable() {
-        return getContext().getApplicationInfo().nativeLibraryDir + "/libgost-plugin.so";
+        return getContext().getApplicationInfo().nativeLibraryDir + "/" + NATIVE_PLUGIN_NAME;
     }
 
     @Override
     protected void populateFiles(@NotNull PathProvider provider) {
-        provider.addPath("libgost-plugin", 0755);
+        provider.addPath(NATIVE_PATH, 0755);
     }
 }
