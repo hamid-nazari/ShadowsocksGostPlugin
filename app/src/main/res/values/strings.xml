@@ -1,31 +1,31 @@
 <resources>
     <string name="app_name">ShadowsocksGOSTPlugin</string>
-    <string name="string_text_title">GOST plugin for Shadowsocks-Android</string>
-    <string name="string_remind_re_enable">Press back button and click \"OK\" to save and apply changes.\nRe-enable my proxy profile in Shadowsocks-Android to make changes take effect.</string>
+    <string name="string_text_title">GOST plugin</string>
+    <string name="string_remind_re_enable">Press <i>back</i> button and press <i>OK</i> to save changes. You need to restart corresponding profile for changes to take effect.</string>
     <string name="string_del_arg" translatable="false">-</string>
     <string name="confirm_del_arg_title">Delete an argument</string>
-    <string name="confirm_del_arg_msg">Are you sure to delete this argument?</string>
-    <string name="string_text_cmdargs">Command line arguments</string>
-    <string name="string_text_desc">Please don\'t include quotes (\") in the command line arguments, they will make GOST fail to start.\n\"${remote.host}\" and \"${remote.port}\" will be replaced with \"Server\" and \"Remote port\" set in Shadowsocks-Android respectively.</string>
-    <string name="string_explain_local_encryption">GOST sets up a local Shadowsocks server, which Shadowsocks-Android directly connects to. To avoid unnecessary overhead, generally, both <b>Shadowsocks-Android</b> itself and <b>GOST\'s \"-L\" parameter</b> are set to <b>\"none\" encryption</b> (or other encryption method if \"none\" is not available) - <b>anyway, it won\'t work if mismatch.</b> Then, GOST establishes actual encrypted connection to the remote server, the encryption method depends on \"-F\" parameter(s).</string>
+    <string name="confirm_del_arg_msg">Are you sure you want to delete this argument?</string>
+    <string name="string_text_cmdargs">How it Works</string>
+    <string name="string_text_desc"><i>Shadowsocks-Android</i> connects to a <i>local Shadowsocks server</i> on <b>${local.host}:${local:port}</b> which must be setup by <i>GOST</i>. This service is usually specified through the first <b>-L</b> argument. Further forwarding nodes (i.e., the <b>-F</b> arguments) and other <i>GOST</i> related command line arguments shall be specified in sequence by user through provided controls below. You may refer to <b>${remote.host}</b> and <b>${remote.port}</b> in values of arguments which are be then replaced with configured <b>Server</b> and <b>Remote port</b>, respectively.</string>
+    <string name="string_explain_local_encryption">To avoid unnecessary performance hit, no encryption is used by default, and hence, <b>Encrypt Method</b> must be set to <b>NONE</b> for default setup in <i>Shadowsocks-Android</i> profile settings.</string>
     <string name="example_cmdarg1" translatable="false">-L</string>
     <string name="example_cmdarg2" translatable="false"><![CDATA[ss://none@${local.host}:${local.port}]]></string>
     <string name="example_cmdarg3" translatable="false">-F</string>
     <string name="example_cmdarg4" translatable="false"><![CDATA[wss://${remote.host}:${remote.port}?secure=true&path=/ws]]></string>
     <string name="string_add_arg" translatable="false">+</string>
     <string-array name="string_add_one_or_two_args">
-        <item>Add 1 argument</item>
-        <item>Add 2 arguments</item>
+        <item>Add single argument (no-value)</item>
+        <item>Add valued argument</item>
     </string-array>
     <string name="string_text_file_entries">Attached files</string>
-    <string name="string_text_files_reminder">You need to add corresponding command line arguments (like: -C config.yaml) to make the file content below actually take effect!</string>
+    <string name="string_text_files_reminder">The following <u>config.yaml</u> is already included. You may leave it empty or use it to fine tune <i>GOST</i> per its documentation</string>
     <string name="string_delete">Delete</string>
     <string name="confirm_del_file_title">Delete a file</string>
-    <string name="confirm_del_file_msg">Are you sure to delete this file?\nFile name: </string>
+    <string name="confirm_del_file_msg">Are you sure you want to delete this file?\nFile name: </string>
     <string name="string_load">Load</string>
-    <string name="still_reading">Still reading the previous file, please retry later</string>
-    <string name="err_file_too_large">Error! File is too large (>1M characters)</string>
-    <string name="example_cfgjson"># sample config, won\'t be saved &amp; applied\nchains:\n- name: chain-0\n\thops:\n\t- name: hop-0\n\t\tnodes:\n\t\t- name: node-0\n\t\t\taddr: example.com:443\n\t\t\tconnector:\n\t\t\t\ttype: http\n\t\t\t\tmetadata:\n\t\t\t\t\tpath: /ws\n\t\t\tdialer:\n\t\t\t\ttype: wss\n\t\t\t\ttls:\n\t\t\t\t\tsecure: true\n\t\t\t\t\tserverName: example.com\n\t\t\t\tmetadata:\n\t\t\t\t\tpath: /ws\nlog:\n\tlevel: debug</string>
+    <string name="still_reading">Still reading the previous file, please try later</string>
+    <string name="err_file_too_large">Error! File is too large (larger than 1M)</string>
+    <string name="example_cfgjson"># sample config, won\'t be saved or applied\nchains:\n- name: chain-0\n\thops:\n\t- name: hop-0\n\t\tnodes:\n\t\t- name: node-0\n\t\t\taddr: example.com:443\n\t\t\tconnector:\n\t\t\t\ttype: http\n\t\t\t\tmetadata:\n\t\t\t\t\tpath: /ws\n\t\t\tdialer:\n\t\t\t\ttype: wss\n\t\t\t\ttls:\n\t\t\t\t\tsecure: true\n\t\t\t\t\tserverName: example.com\n\t\t\t\tmetadata:\n\t\t\t\t\tpath: /ws\nlog:\n\tlevel: debug</string>
     <string name="example_cacert">-----BEGIN CERTIFICATE-----\n(Your own CA certificate in Base64 PEM format)\n-----END CERTIFICATE-----</string>
     <string name="example_clientcert">-----BEGIN CERTIFICATE-----\n(Your own client certificate in Base64 PEM format)\n-----END CERTIFICATE-----</string>
     <string name="example_clientcertkey">-----BEGIN RSA PRIVATE KEY-----\n(Your own client certificate key in Base64 PEM format)\n-----END RSA PRIVATE KEY-----</string>
@@ -35,22 +35,22 @@
     <string name="err_file_name_contains_slash">Error! File name contains slash (/)</string>
     <string name="err_file_already_exists">Error! File already exists</string>
     <string name="empty_config">Configuration is empty</string>
-    <string name="prompt_config_mig_title">Migrate to new config format</string>
-    <string name="prompt_config_mig_msg">New config format enables more functions like setting mutual TLS authentication certificates.\nYou may undo this migration any time later, but doing so will irrecoverably discard any change made after the migration.</string>
+    <string name="prompt_config_mig_title">Migrate to the new encoded configuration format</string>
+    <string name="prompt_config_mig_msg">New encoded configuration format allows user to utilize the full <i>GOST</i> functionality without experiencing weired issues related to CLI parsing. Note that after migration to new format, old values won\'t be recoverable.</string>
     <string name="config_mig_done">Successfully migrated to new config format</string>
-    <string name="config_mig_err">Error migrating to new config format!</string>
+    <string name="config_mig_err">Error migrating to new config format</string>
     <string name="loaded_encoded_config">Loaded configuration</string>
-    <string name="err_loading_encoded_config">Error loading configuration!</string>
-    <string name="saved_encoded_config">Saved configuration</string>
+    <string name="err_loading_encoded_config">Error loading configuration</string>
+    <string name="saved_encoded_config">Configuration saved</string>
     <string name="error_saving_encoded_config">Error saving configuration</string>
     <string name="ok">OK</string>
     <string name="discard_changes">Discard Changes</string>
     <string name="cancel">Cancel</string>
-    <string name="confirm_save_apply_title">Save &amp; apply configurations?</string>
+    <string name="confirm_save_apply_title">Save and apply configuration?</string>
     <string name="confirm_save_apply_msg">Press back button again to continue editing.</string>
     <string name="cancelled">Cancelled</string>
     <string name="string_text_dns_server">DNS server</string>
-    <string name="string_dns_server_desc">Currently we let GOST rely on itself rather than the system to resolve domain names. In other words, the system DNS settings are bypassed (ignored).\nYou may specify the DNS server you want below, in the format of \"IP_ADDRESS:PORT\", like \"119.29.29.29:53\".</string>
+    <string name="string_dns_server_desc">Currently, <i>GOST</i> uses its own name resolution mechanism and won\'t use the system DNS settings. Specify the desired DNS as <i>119.29.29.29:53</i>.</string>
     <string name="example_dns_server" translatable="false">8.8.8.8:53</string>
     <string name="string_text_legacyCfg">Defunct legacy configuration</string>
     <string name="string_text_legacyCfg_desc">The following configuration <b>no longer takes effect</b>. It\'s here only for backup purpose.\nYou may click \"Revert to legacy config\" to make it take effect yet again, but doing so will <b>irrecoverably discard all change made after the migrating from legacy config</b>.\nYou may export (duplicate) the proxy profile entry in Shadowsocks-Android to make a backup for the current new config, however.</string>
