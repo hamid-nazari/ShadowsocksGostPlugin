@@ -13,8 +13,8 @@ android {
         minSdk 26
         //noinspection ExpiredTargetSdkVersion
         targetSdk 29
-        versionCode 400001
-        versionName "4.0.0-rc1"
+        versionCode 300002
+        versionName "3.0.0-rc2"
         manifestPlaceholders = [pluginID: "gost"]
     }
     signingConfigs {

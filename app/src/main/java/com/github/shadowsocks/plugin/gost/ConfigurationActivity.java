@@ -185,7 +185,6 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
 
                         // populate original plugin options string to UI
                         final String legacyCfg = pluginOptions.toString();
-                        populateLegacyCfg(legacyCfg);
 
                         // populate command line arguments to UI
                         ArrayList<String> substrings = new ArrayList<>();
@@ -517,19 +516,6 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
         }
         this.decodedPluginOptions.put("DNSServer", dnsServer);
 
-        // save legacyCfg, if there's one
-        String legacyCfg = "";
-        EditText editText_legacyCfg = findViewById(R.id.editText_legacyCfg);
-        Editable editable_legacyCfg = editText_legacyCfg.getText();
-        if (editable_legacyCfg != null) {
-            legacyCfg = editable_legacyCfg.toString();
-        }
-        if (legacyCfg.length() > 0) {
-            this.decodedPluginOptions.put("LegacyCfg", legacyCfg);
-        } else {
-            this.decodedPluginOptions.remove("LegacyCfg");
-        }
-
         // (not UI, but also saved here) save app data directory path
         File dataDir = new ContextWrapper(getApplicationContext()).getFilesDir();
         // HNZ: Replacing plugin package FQN with that of the ShadowSocks so that native GOST helper would not be coupled to changes
@@ -612,26 +598,6 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
         }
         EditText editText_dns_server = findViewById(R.id.editText_dns_server);
         editText_dns_server.setText(dnsServer);
-
-        // populate legacyCfg, if there's one
-        String legacyCfg = "";
-        try {
-            legacyCfg = this.decodedPluginOptions.getString("LegacyCfg");
-        } catch (JSONException ignored) {
-        }
-        this.populateLegacyCfg(legacyCfg);
-    }
-
-    private void populateLegacyCfg(String legacyCfg) {
-        boolean hasLegacyCfg = legacyCfg != null && legacyCfg.length() > 0;
-        Button button_revert_to_legacy_config = findViewById(R.id.button_revert_to_legacy_config);
-        button_revert_to_legacy_config.setClickable(hasLegacyCfg);
-        button_revert_to_legacy_config.setEnabled(hasLegacyCfg);
-        EditText editText_legacyCfg = findViewById(R.id.editText_legacyCfg);
-        editText_legacyCfg.setEnabled(hasLegacyCfg);
-        editText_legacyCfg.setText(hasLegacyCfg ? legacyCfg : "");
-        LinearLayout linearlayout_legacyCfg = findViewById(R.id.linearlayout_legacyCfg);
-        linearlayout_legacyCfg.setVisibility(hasLegacyCfg ? View.VISIBLE : View.GONE);
     }
 
     private Handler handler;
@@ -690,30 +656,6 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
                     return;
                 }
                 addFileEntry(fileName, "", "", true);
-            }
-        });
-
-        Button button_revert_to_legacy_config = findViewById(R.id.button_revert_to_legacy_config);
-        button_revert_to_legacy_config.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                String title = getString(R.string.confirm_revert_to_legacy_config_title);
-                String msg = getString(R.string.confirm_revert_to_legacy_config_msg);
-                String positiveButton = getString(R.string.ok);
-                String negativeButton = getString(R.string.cancel);
-                FailableRunnable<Exception> positive = () -> {
-                    EditText editText_legacyCfg = findViewById(R.id.editText_legacyCfg);
-                    String legacyCfg = editText_legacyCfg.getText().toString();
-                    saveChanges(new PluginOptions(legacyCfg));
-                    finish();
-                };
-
-                Runnable negative = () -> {
-                };
-                String toastMsgOnSuccess = getString(R.string.reverted_to_legacy_config);
-                String toastMsgOnFail = getString(R.string.error_reverting_to_legacy_config);
-                String toastMsgOnCancel = getString(R.string.cancelled);
-                askForConsent(title, msg, positiveButton, negativeButton, positive, negative, toastMsgOnSuccess, toastMsgOnFail, toastMsgOnCancel);
             }
         });
     }
