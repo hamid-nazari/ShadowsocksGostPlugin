@@ -1,3 +1,5 @@
+import org.apache.tools.ant.taskdefs.condition.Os
+
 plugins {
     id 'com.android.application'
 }
@@ -13,9 +15,10 @@ android {
         minSdk 26
         //noinspection ExpiredTargetSdkVersion
         targetSdk 29
-        versionCode 300002
-        versionName "3.0.0-rc2"
+        versionCode 400000
+        versionName "4.0.0"
         manifestPlaceholders = [pluginID: "gost"]
+        setProperty("archivesBaseName", "ShadowsocksGOSTPlugin-$versionName")
     }
     signingConfigs {
         releaseConfig {
@@ -26,6 +29,7 @@ android {
         }
     }
     buildTypes {
+
         debug {
             debuggable true
         }
@@ -46,21 +50,26 @@ dependencies {
     implementation 'org.apache.commons:commons-lang3:3.12.0'
 }
 
-//task buildGoLibrary(type: Exec) {
-//    environment ([ANDROID_NDK_ROOT: android.ndkDirectory])
-//    commandLine ('../build.sh')
-//    inputs.files '../build.sh'
-//    outputs.dir 'src/main/jniLibs'
-//}
-//
-//clean {
-//     delete "${project.projectDir}/src/main/jniLibs"
-//}
-//
-//tasks.whenTaskAdded { theTask ->
-//    if (theTask.name.equals("preDebugBuild") || theTask.name.equals("preReleaseBuild")) {
-//        theTask.dependsOn "buildGoLibrary"
-//    }
-//}
+task buildGoLibrary(type: Exec) {
+    if(Os.isFamily(Os.FAMILY_WINDOWS))
+    {
+        commandLine ('cmd')
+        return
+    }
+    environment ([ANDROID_NDK_ROOT: android.ndkDirectory])
+    commandLine ('../build.gost.sh')
+    inputs.files '../build.gost.sh'
+    outputs.dir 'src/main/jniLibs'
+}
+
+clean {
+     delete "${project.projectDir}/src/main/jniLibs"
+}
+
+tasks.whenTaskAdded { theTask ->
+    if (theTask.name.equals("preDebugBuild") || theTask.name.equals("preReleaseBuild")) {
+        theTask.dependsOn "buildGoLibrary"
+    }
+}
 
 

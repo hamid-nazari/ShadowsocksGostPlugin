@@ -2,7 +2,6 @@
 <resources>
     <string name="app_name">ShadowsocksGOSTPlugin</string>
     <string name="string_text_title">GOST 插件 Shadowsocks-Android</string>
-    <string name="string_remind_re_enable">按返回键再点击“确定”按钮即可保存并应用配置参数。\n需要在Shadowsocks-Android里重新开启一下，配置才会生效。</string>
     <string name="confirm_del_arg_title">删除单个命令行参数</string>
     <string name="confirm_del_arg_msg">你确定要删除这个命令行参数吗？</string>
     <string name="string_text_cmdargs">命令行参数</string>
@@ -12,7 +11,6 @@
     </string-array>
     <string name="string_text_file_entries">附加文件</string>
     <string name="string_text_desc">请不要在命令行参数中加入双引号(\")，加了会让GOST无法启动。\n\"${remote.host}\"与\"${remote.port}\"将会被分别替换为Shadowsocks-Android中设置的\"服务器\"与\"远程端口\"。</string>
-    <string name="string_explain_local_encryption">GOST会在本地开一个Shadowsocks服务器，Shadowsocks-Android直接连的就是它。为了避免不必要的开销，一般而言，<b>Shadowsocks-Android</b>本身和<b>GOST的\"-L\"参数</b>都被设为<b>\"none\"无加密模式</b>（如果\"none\"不可用，则换用其他加密方法）——无论如何，<b>两者必须相符</b>才能正常工作。然后GOST会按照\"-F\"参数指定的加密方法来跟远程服务器建立真正的加密连接。</string>
     <string name="string_text_files_reminder">必须添加对应的命令行参数（例如： -C config.yaml）才能让下面的文件内容生效！</string>
     <string name="string_delete">删除</string>
     <string name="confirm_del_file_title">删除单个文件</string>
@@ -46,11 +44,4 @@
     <string name="cancelled">已取消</string>
     <string name="string_text_dns_server">DNS服务器</string>
     <string name="string_dns_server_desc">目前我们让GOST依靠自己来解析域名，而不是依靠系统。换句话说，系统DNS设置会被绕过（无视）。\n你可以在下面指定你想要的DNS服务器，格式为\"IP地址:端口号\"，比如\"119.29.29.29:53\"。</string>
-    <string name="string_text_legacyCfg">不再生效的旧版配置</string>
-    <string name="string_text_legacyCfg_desc">下列配置信息已经<b>不再生效</b>了。把它放在这里只是出于备份目的。\n你可以点击\"回退到旧版配置\"来让它重新生效，但这么做会<b>永久丢失自旧版迁移以来至今的所有改动</b>。\n不过，你可以在Shadowsocks-Android里导出（复制）一下代理设置条目，这样就能把当前的新配置备份下来了。</string>
-    <string name="revert_to_legacy_config">回退到旧版配置</string>
-    <string name="reverted_to_legacy_config">已回退到旧版配置</string>
-    <string name="error_reverting_to_legacy_config">回退到旧版配置时出错</string>
-    <string name="confirm_revert_to_legacy_config_title">回退到旧版配置？</string>
-    <string name="confirm_revert_to_legacy_config_msg">这么做会<b>永久丢失自旧版迁移以来至今的所有改动</b>。</string>
 </resources>
