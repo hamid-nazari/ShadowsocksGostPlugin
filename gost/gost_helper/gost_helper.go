@@ -88,6 +88,7 @@ const VAR_REMOTE_PORT = "SS_REMOTE_PORT"
 const VAR_PLUGIN_OPTIONS = "SS_PLUGIN_OPTIONS"
 
 const PO_ENCODED = "encoded="
+const PO_LEGACY_ENCODED = "CFGBLOB="
 const PO_VPN_MODE = "__android_vpn="
 
 const FILE_NAME_CONFIG = "config.yaml"
@@ -115,6 +116,10 @@ var (
 	socketPath string
 	configData ConfigData
 	Version    string
+	localHost  string
+	localPort  string
+	remoteHost string
+	remotePort string
 )
 
 func ControlOnConnSetup(network string, address string, connection syscall.RawConn) error {
@@ -167,13 +172,14 @@ func PreInit() {
 
 	socketPath = PWD + "/" + DIRECT_SOCKET_PATH
 
-	localHost := os.Getenv(VAR_LOCAL_HOST)
-	localPort := os.Getenv(VAR_LOCAL_PORT)
-	remoteHost := os.Getenv(VAR_REMOTE_HOST)
-	remotePort := os.Getenv(VAR_REMOTE_PORT)
+	localHost = os.Getenv(VAR_LOCAL_HOST)
+	localPort = os.Getenv(VAR_LOCAL_PORT)
+	remoteHost = os.Getenv(VAR_REMOTE_HOST)
+	remotePort = os.Getenv(VAR_REMOTE_PORT)
 	pluginOptions := os.Getenv(VAR_PLUGIN_OPTIONS)
 
 	var hasLogConfig bool
+	var appendConfigFile bool
 	var dataDir string
 
 	splitted := strings.Split(pluginOptions, ";")
@@ -181,10 +187,15 @@ func PreInit() {
 	for _, subString := range splitted {
 		if strings.HasPrefix(subString, PO_VPN_MODE) {
 			VPN = true
+			pluginOptions = strings.ReplaceAll(pluginOptions, PO_VPN_MODE+";", "")
 			continue
 		}
 		if strings.HasPrefix(subString, PO_ENCODED) {
 			encoded = subString[len(PO_ENCODED):]
+			continue
+		}
+		if strings.HasPrefix(subString, PO_LEGACY_ENCODED) {
+			encoded = subString[len(PO_LEGACY_ENCODED):]
 			continue
 		}
 	}
@@ -202,12 +213,8 @@ func PreInit() {
 				if strings.HasPrefix(arg, "\"") && strings.HasSuffix(arg, "\"") {
 					arg = arg[1:(len(arg) - 2)]
 				}
-				arg = strings.ReplaceAll(arg, KEY_LEGACY_HOST, KEY_REMOTE_HOST)
-				arg = strings.ReplaceAll(arg, KEY_LEGACY_PORT, KEY_REMOTE_PORT)
-				arg = strings.ReplaceAll(arg, KEY_REMOTE_HOST, remoteHost)
-				arg = strings.ReplaceAll(arg, KEY_REMOTE_PORT, remotePort)
-				arg = strings.ReplaceAll(arg, KEY_LOCAL_HOST, localHost)
-				arg = strings.ReplaceAll(arg, KEY_LOCAL_PORT, localPort)
+				arg = replaceLegacyConfigKeys(arg)
+				arg = replaceConfigKeys(arg)
 				os.Args = append(os.Args, arg)
 			}
 		}
@@ -230,6 +237,7 @@ func PreInit() {
 		for fileName, fileData := range configData.Files {
 			if strings.EqualFold(fileName, FILE_NAME_CONFIG) && strings.Contains(fileData, CONFIG_LOG_ENTRY) {
 				hasLogConfig = true
+				appendConfigFile = true
 			}
 			err = os.WriteFile(fileName, []byte(fileData), 0600)
 			if err != nil {
@@ -240,17 +248,24 @@ func PreInit() {
 		configData = ConfigData{}
 		dataDir = PWD
 
-		pluginOptions = strings.ReplaceAll(pluginOptions, KEY_LEGACY_HOST, remoteHost)
-		pluginOptions = strings.ReplaceAll(pluginOptions, KEY_LEGACY_PORT, remotePort)
+		pluginOptions = replaceLegacyConfigKeys(pluginOptions)
+		pluginOptions = replaceConfigKeys(pluginOptions)
 
 		os.Args = append(os.Args, "-L")
-		os.Args = append(os.Args, fmt.Sprintf("ss+tcp://none@[%s]:%s", localHost, localPort))
-		os.Args = append(os.Args, strings.Split(pluginOptions, ";")...)
+		os.Args = append(os.Args, fmt.Sprintf("ss+tcp://none@%s:%s", localHost, localPort))
+		os.Args = append(os.Args, strings.Split(pluginOptions, " ")...)
 	}
+
+	configFilePath := dataDir + "/" + FILE_NAME_CONFIG
 
 	// This is to make sure config.yaml is always included (even if it is empty) and logging is either configured by user or is off
 	if !hasLogConfig {
-		fConfig, err := os.OpenFile(FILE_NAME_CONFIG, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		openFlags := os.O_CREATE | os.O_WRONLY
+		if appendConfigFile {
+			openFlags |= os.O_APPEND
+		}
+
+		fConfig, err := os.OpenFile(configFilePath, openFlags, 0644)
 		if err == nil {
 			fConfig.WriteString(CONFIG_NO_LOG)
 			fConfig.Close()
@@ -258,13 +273,14 @@ func PreInit() {
 	}
 
 	os.Args = append(os.Args, "-C")
-	os.Args = append(os.Args, dataDir+"/"+FILE_NAME_CONFIG)
+	os.Args = append(os.Args, configFilePath)
 
 	if configData.DNSServer == "" {
 		configData.DNSServer = DEFAULT_DNS_SERVER
 	}
 
 	validUsage = localHost != "" && localPort != ""
+
 }
 
 func PostInit() {
@@ -278,6 +294,7 @@ func PostInit() {
 	log.Printf(" - Direct Socket: %s", socketPath)
 	log.Printf(" - DNS: %s", configData.DNSServer)
 	log.Printf(" - VPN: %v", VPN)
+	log.Printf(" - Args: %v", os.Args)
 
 	net.DefaultResolver = &net.Resolver{Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 		dialer := net.Dialer{}
@@ -292,4 +309,32 @@ func PostInit() {
 			dialer.Control = ControlOnConnSetup
 		}
 	}
+}
+
+func replaceLegacyConfigKeys(configKey string) string {
+	if !strings.Contains(configKey, "#") {
+		return configKey
+	}
+
+	configKey = strings.ReplaceAll(configKey, KEY_LEGACY_HOST, KEY_REMOTE_HOST)
+	configKey = strings.ReplaceAll(configKey, KEY_LEGACY_PORT, KEY_REMOTE_PORT)
+	configKey = strings.ReplaceAll(configKey, "#"+VAR_LOCAL_HOST, KEY_LOCAL_HOST)
+	configKey = strings.ReplaceAll(configKey, "#"+VAR_LOCAL_PORT, KEY_LOCAL_PORT)
+	configKey = strings.ReplaceAll(configKey, "#"+VAR_REMOTE_HOST, KEY_REMOTE_HOST)
+	configKey = strings.ReplaceAll(configKey, "#"+VAR_REMOTE_PORT, KEY_REMOTE_PORT)
+
+	return configKey
+}
+
+func replaceConfigKeys(configKey string) string {
+	if !strings.Contains(configKey, "${") {
+		return configKey
+	}
+
+	configKey = strings.ReplaceAll(configKey, KEY_REMOTE_HOST, remoteHost)
+	configKey = strings.ReplaceAll(configKey, KEY_REMOTE_PORT, remotePort)
+	configKey = strings.ReplaceAll(configKey, KEY_LOCAL_HOST, localHost)
+	configKey = strings.ReplaceAll(configKey, KEY_LOCAL_PORT, localPort)
+
+	return configKey
 }

@@ -51,8 +51,6 @@ import java.util.Objects;
 import java.util.Set;
 
 public class ConfigurationActivity extends com.github.shadowsocks.plugin.ConfigurationActivity {
-    public static final String OPTION_KEY_ENCODED = "encoded";
-
     private LinearLayout linearlayout_cmdargs;
     private LinearLayout linearlayout_files;
     private Spinner argumentCountSpinner;
@@ -119,8 +117,8 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
     protected void onInitializePluginOptions(@NonNull PluginOptions pluginOptions) {
         this.pluginOptions = pluginOptions;
 
-        String encodedPluginOptions = pluginOptions.get(OPTION_KEY_ENCODED);
-        if (encodedPluginOptions == null || encodedPluginOptions.length() == 0) {
+        String encodedPluginOptions = pluginOptions.get(getString(R.string.cfg_po_encoded));
+        if (encodedPluginOptions == null || encodedPluginOptions.isEmpty()) {
             // no encoded config
             this.decodedPluginOptions = new JSONObject();
 
@@ -140,7 +138,7 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
                 addFileEntry(fileName, fileData, fileHint, false);
             }
 
-            if (pluginOptions.toString().length() == 0) {
+            if (pluginOptions.isEmpty()) {
                 // nothing here, just empty
                 showToast(R.string.empty_config);
             } else {
@@ -184,7 +182,7 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
                         // and then they will be saved by saveUI() in onSaveInstanceState()
 
                         // populate original plugin options string to UI
-                        final String legacyCfg = pluginOptions.toString();
+                        final String legacyCfg = replaceLegacyKeys(pluginOptions.toString());
 
                         // populate command line arguments to UI
                         ArrayList<String> substrings = new ArrayList<>();
@@ -428,8 +426,8 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
                     readFileThread = new Thread(() -> {
                         try {
                             StringBuilder stringBuilder = new StringBuilder();
-                            try(InputStream inputStream = resolver.openInputStream(uri);
-                            BufferedReader reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(inputStream)));) {
+                            try (InputStream inputStream = resolver.openInputStream(uri);
+                                 BufferedReader reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(inputStream)));) {
                                 char[] buf = new char[4096];
                                 for (int r, t = 0; (r = reader.read(buf)) != -1; t += r) {
                                     if (t > 1024 * 1024) {
@@ -671,7 +669,7 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
             saveUI();
 
             pluginOptions.clear(); // discard keys other than encoded config
-            pluginOptions.put(OPTION_KEY_ENCODED, Base64.getEncoder().withoutPadding().encodeToString(decodedPluginOptions.toString().getBytes(StandardCharsets.UTF_8)));
+            pluginOptions.put(getString(R.string.cfg_po_encoded), Base64.getEncoder().withoutPadding().encodeToString(decodedPluginOptions.toString().getBytes(StandardCharsets.UTF_8)));
             saveChanges(pluginOptions);
             finish();
         };
@@ -728,6 +726,18 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
         toast.cancel();
         dismissedConsent = true;
         consentDialog.show();
+    }
+
+    private String replaceLegacyKeys(String pluginOptions) {
+        if (!pluginOptions.contains("#"))
+            return pluginOptions;
+        pluginOptions = pluginOptions.replaceAll("#SS_HOST", "#SS_REMOTE_HOST");
+        pluginOptions = pluginOptions.replaceAll("#SS_PORT", "#SS_REMOTE_PORT");
+        pluginOptions = pluginOptions.replaceAll("#SS_LOCAL_HOST", "\\$\\{" + getString(R.string.cfg_key_local_host) + "\\}");
+        pluginOptions = pluginOptions.replaceAll("#SS_LOCAL_PORT", "\\$\\{" + getString(R.string.cfg_key_local_port) + "\\}");
+        pluginOptions = pluginOptions.replaceAll("#SS_REMOTE_HOST", "\\$\\{" + getString(R.string.cfg_key_remote_host) + "\\}");
+        pluginOptions = pluginOptions.replaceAll("#SS_REMOTE_PORT", "\\$\\{" + getString(R.string.cfg_key_remote_port) + "\\}");
+        return pluginOptions;
     }
 
 }

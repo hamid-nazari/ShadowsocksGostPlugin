@@ -50,4 +50,9 @@
     <string name="string_text_dns_server">DNS server</string>
     <string name="string_dns_server_desc">Currently, <i>GOST</i> uses its own name resolution mechanism and won\'t use the system DNS settings. Specify the desired DNS as <i>119.29.29.29:53</i>.</string>
     <string name="example_dns_server" translatable="false">8.8.8.8:53</string>
+    <string name="cfg_key_remote_host" translatable="false">remote.host</string>
+    <string name="cfg_key_remote_port" translatable="false">remote.port</string>
+    <string name="cfg_key_local_host" translatable="false">local.host</string>
+    <string name="cfg_key_local_port" translatable="false">local.port</string>
+    <string name="cfg_po_encoded" translatable="false">encoded</string>
 </resources>
