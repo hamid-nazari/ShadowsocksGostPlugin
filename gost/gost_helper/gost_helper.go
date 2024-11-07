@@ -55,7 +55,7 @@ void
 set_timeout(int sock)
 {
     struct timeval tv;
-    tv.tv_sec  = 3;
+    tv.tv_sec  = 15;
     tv.tv_usec = 0;
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv, sizeof(struct timeval));
     setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (char *)&tv, sizeof(struct timeval));
@@ -65,7 +65,6 @@ set_timeout(int sock)
 import "C"
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -79,7 +78,6 @@ import (
 
 const DIRECT_SOCKET_PATH = "protect_path"
 const GOST_FILES_PATH = "gost_files"
-const DEFAULT_DNS_SERVER = "8.8.8.8:53"
 
 const VAR_LOCAL_HOST = "SS_LOCAL_HOST"
 const VAR_LOCAL_PORT = "SS_LOCAL_PORT"
@@ -104,10 +102,9 @@ const CONFIG_LOG_ENTRY = "log:"
 const CONFIG_NO_LOG = "\nlog:\n   level: info\n   format: json\n   output: none\n"
 
 type ConfigData struct {
-	CmdArgs   [][]string
-	DataDir   string
-	Files     map[string]string
-	DNSServer string
+	CmdArgs [][]string
+	DataDir string
+	Files   map[string]string
 }
 
 var (
@@ -275,10 +272,6 @@ func PreInit() {
 	os.Args = append(os.Args, "-C")
 	os.Args = append(os.Args, configFilePath)
 
-	if configData.DNSServer == "" {
-		configData.DNSServer = DEFAULT_DNS_SERVER
-	}
-
 	validUsage = localHost != "" && localPort != ""
 
 }
@@ -292,14 +285,8 @@ func PostInit() {
 	log.Printf("ShadowSocks Android Helper for GOST")
 	log.Printf(" - GOST: v%s (%s %s/%s)", Version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 	log.Printf(" - Direct Socket: %s", socketPath)
-	log.Printf(" - DNS: %s", configData.DNSServer)
 	log.Printf(" - VPN: %v", VPN)
 	log.Printf(" - Args: %v", os.Args)
-
-	net.DefaultResolver = &net.Resolver{Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-		dialer := net.Dialer{}
-		return dialer.DialContext(ctx, network, configData.DNSServer)
-	}, PreferGo: true}
 
 	if VPN {
 		net.ListenUDPListenConfigHook = func(config *net.ListenConfig) {

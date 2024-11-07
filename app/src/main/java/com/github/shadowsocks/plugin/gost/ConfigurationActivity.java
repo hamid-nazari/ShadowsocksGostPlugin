@@ -502,18 +502,6 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
         }
         this.decodedPluginOptions.put("Files", files);
 
-        // save DNS server
-        EditText editText_dns_server = findViewById(R.id.editText_dns_server);
-        Editable editable_dns_server = editText_dns_server.getText();
-        String dnsServer = "";
-        if (editable_dns_server != null) {
-            dnsServer = editable_dns_server.toString();
-        }
-        if (dnsServer.length() == 0) {
-            dnsServer = getString(R.string.example_dns_server);
-        }
-        this.decodedPluginOptions.put("DNSServer", dnsServer);
-
         // (not UI, but also saved here) save app data directory path
         File dataDir = new ContextWrapper(getApplicationContext()).getFilesDir();
         // HNZ: Replacing plugin package FQN with that of the ShadowSocks so that native GOST helper would not be coupled to changes
@@ -584,18 +572,6 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
                 continue;
             addFileEntry(fileName, jsonObject.getString(fileName), "", true);
         }
-
-        // populate dns server
-        String dnsServer = "";
-        try {
-            dnsServer = this.decodedPluginOptions.getString("DNSServer");
-        } catch (JSONException ignored) {
-        }
-        if (dnsServer.length() == 0) {
-            dnsServer = getString(R.string.example_dns_server);
-        }
-        EditText editText_dns_server = findViewById(R.id.editText_dns_server);
-        editText_dns_server.setText(dnsServer);
     }
 
     private Handler handler;

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-[ -z "$GOLANG_VERSION" ] && GOLANG_VERSION="1.22.0"
-[ -z "$GOST_VERSION" ] && GOST_VERSION="3.0.0-nightly.20240201"
+[ -z "$GOLANG_VERSION" ] && GOLANG_VERSION="1.23.3"
+[ -z "$GOST_VERSION" ] && GOST_VERSION="3.0.0-nightly.20241107"
 [ -z "$ANDROID_NDK_ROOT" ] && NDK_VERSION="r26c"
 
 set -e
@@ -17,9 +17,11 @@ pushd ".go_build" > /dev/null
 if [ ! -e go ]
 then
   GOLANG_RELEASE="go${GOLANG_VERSION}.linux-amd64.tar.gz"
-  GOLANG_URL="https://dl.google.com/go/$GOLANG_RELEASE"
+  GOLANG_DOWNLOAD="Go.v${GOLANG_VERSION}.Linux.x64_p30download.com.tar.gz"
+  GOLANG_URL="https://pdn.sharezilla.ir/d/software/${GOLANG_DOWNLOAD}"
   echo "GO was not detected, downloading '$GOLANG_RELEASE' ($GOLANG_URL) ..."
   curl $GOLANG_URL -LO
+  mv $GOLANG_DOWNLOAD $GOLANG_RELEASE
   tar -zxf $GOLANG_RELEASE || exit $?
   pushd go > /dev/null
   patch -p1 -r . < ../../gost/go.patch

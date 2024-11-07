@@ -143,37 +143,6 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <TextView
-                    android:id="@+id/text_dns_server"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16sp"
-                    android:text="@string/string_text_dns_server"
-                    android:textAlignment="viewStart"
-                    android:textAppearance="@style/TextAppearance.AppCompat.Large"
-                    android:textSize="24sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/text_dns_server_desc"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/string_dns_server_desc"
-                    android:textAlignment="textStart"
-                    android:textAppearance="@style/TextAppearance.AppCompat.Large"
-                    android:textSize="16sp" />
-
-                <EditText
-                    android:id="@+id/editText_dns_server"
-                    android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
-                    android:ems="10"
-                    android:gravity="start"
-                    android:hint="@string/example_dns_server"
-                    android:imeOptions="actionDone"
-                    android:inputType="text"
-                    android:text="@string/example_dns_server" />
-
             </LinearLayout>
         </ScrollView>
     </LinearLayout>
