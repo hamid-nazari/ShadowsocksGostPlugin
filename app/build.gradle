@@ -15,8 +15,8 @@ android {
         minSdk 26
         //noinspection ExpiredTargetSdkVersion
         targetSdk 29
-        versionCode 410000
-        versionName "4.1.0"
+        versionCode 420000
+        versionName "4.2.0"
         manifestPlaceholders = [pluginID: "gost"]
         setProperty("archivesBaseName", "ShadowsocksGOSTPlugin-$versionName")
     }

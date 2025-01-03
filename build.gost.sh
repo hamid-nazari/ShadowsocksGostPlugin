@@ -1,7 +1,7 @@
 #!/bin/bash
 
-[ -z "$GOLANG_VERSION" ] && GOLANG_VERSION="1.23.3"
-[ -z "$GOST_VERSION" ] && GOST_VERSION="3.0.0-nightly.20241107"
+[ -z "$GOLANG_VERSION" ] && GOLANG_VERSION="1.23.4"
+[ -z "$GOST_VERSION" ] && GOST_VERSION="3.0.0"
 [ -z "$ANDROID_NDK_ROOT" ] && NDK_VERSION="r26c"
 
 set -e
@@ -17,11 +17,13 @@ pushd ".go_build" > /dev/null
 if [ ! -e go ]
 then
   GOLANG_RELEASE="go${GOLANG_VERSION}.linux-amd64.tar.gz"
-  GOLANG_DOWNLOAD="Go.v${GOLANG_VERSION}.Linux.x64_p30download.com.tar.gz"
-  GOLANG_URL="https://pdn.sharezilla.ir/d/software/${GOLANG_DOWNLOAD}"
+  # GOLANG_DOWNLOAD="Go.v${GOLANG_VERSION}.Linux.x64_p30download.com.tar.gz"
+  GOLANG_DOWNLOAD=$GOLANG_RELEASE
+  # GOLANG_URL="https://pdn.sharezilla.ir/d/software/${GOLANG_DOWNLOAD}"
+  GOLANG_URL="https://go.dev/dl/${GOLANG_RELEASE}"
   echo "GO was not detected, downloading '$GOLANG_RELEASE' ($GOLANG_URL) ..."
-  curl $GOLANG_URL -LO
-  mv $GOLANG_DOWNLOAD $GOLANG_RELEASE
+  [ -f $GOLANG_DOWNLOAD ] || curl $GOLANG_URL -LO
+  mv -n $GOLANG_DOWNLOAD $GOLANG_RELEASE
   tar -zxf $GOLANG_RELEASE || exit $?
   pushd go > /dev/null
   patch -p1 -r . < ../../gost/go.patch
@@ -37,14 +39,14 @@ then
   GOST_RELEASE="gost_v${GOST_VERSION}.tar.gz"
   GOST_URL="https://github.com/go-gost/gost/archive/refs/tags/v${GOST_VERSION}.tar.gz"
   echo "GOST was not detected, downloading '$GOST_RELEASE' ($GOST_URL) ..."
-  curl $GOST_URL -Lo $GOST_RELEASE
+  [ -f $GOST_RELEASE ] || curl $GOST_URL -Lo $GOST_RELEASE
   tar -zxf $GOST_RELEASE || exit $?
   mv gost-* gost
 fi
 
 latest_local_mod=$(find "../gost" -mindepth 1 -type f -printf '%T@\n' | sort -k1,1nr | head -1);
 latest_gost_release_mod=$(find "gost" -mindepth 1 -type f -printf '%T@\n' | sort -k1,1nr | head -1);
-if [[ $latest_local_mod > $latest_gost_release_mod ]] 
+if [[ !(-d "gost/gost_helper") || ( $latest_local_mod > $latest_gost_release_mod ) ]] 
 then
   pushd gost > /dev/null
   patch --no-backup-if-mismatch -tlNp1 -r /tmp/rejects.txt < ../../gost/gost.patch || echo "GOST patching failed (already patched?)"
@@ -83,7 +85,7 @@ echo "Android NDK root: $ANDROID_NDK_ROOT"
 pushd gost > /dev/null
 
 src="./cmd/gost";
-latest_mod=$(find $src "gost_helper" -mindepth 1 -type f -printf '%T@\n' | sort -k1,1nr | head -1);
+latest_mod=$(find $src "gost_helper" -mindepth 1 -type f -printf '%T@\n' | sort -k1,1nr | head -1) || exit $?;
 
 echo "Building native GO modules"
 echo " + Started: $(date)"
