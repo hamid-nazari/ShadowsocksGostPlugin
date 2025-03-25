@@ -232,9 +232,12 @@ func PreInit() {
 			}
 		}
 		for fileName, fileData := range configData.Files {
-			if strings.EqualFold(fileName, FILE_NAME_CONFIG) && strings.Contains(fileData, CONFIG_LOG_ENTRY) {
-				hasLogConfig = true
+			if strings.EqualFold(fileName, FILE_NAME_CONFIG) {
 				appendConfigFile = true
+				fileData = replaceConfigKeys(fileData)
+				if strings.Contains(fileData, CONFIG_LOG_ENTRY) {
+					hasLogConfig = true
+				}
 			}
 			err = os.WriteFile(fileName, []byte(fileData), 0600)
 			if err != nil {
