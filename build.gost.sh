@@ -1,7 +1,7 @@
 #!/bin/bash
 
-[ -z "$GOLANG_VERSION" ] && GOLANG_VERSION="1.23.4"
-[ -z "$GOST_VERSION" ] && GOST_VERSION="3.0.0"
+[ -z "$GOLANG_VERSION" ] && GOLANG_VERSION="1.25.0"
+[ -z "$GOST_VERSION" ] && GOST_VERSION="3.2.4"
 [ -z "$ANDROID_NDK_ROOT" ] && NDK_VERSION="r26c"
 
 set -e
@@ -21,9 +21,11 @@ then
   GOLANG_DOWNLOAD=$GOLANG_RELEASE
   # GOLANG_URL="https://pdn.sharezilla.ir/d/software/${GOLANG_DOWNLOAD}"
   GOLANG_URL="https://go.dev/dl/${GOLANG_RELEASE}"
-  echo "GO was not detected, downloading '$GOLANG_RELEASE' ($GOLANG_URL) ..."
+  echo "GO was not detected"
+  [ -f $GOLANG_DOWNLOAD ] || echo "Downloading '$GOLANG_RELEASE' ($GOLANG_URL) ..."
   [ -f $GOLANG_DOWNLOAD ] || curl $GOLANG_URL -LO
-  mv -n $GOLANG_DOWNLOAD $GOLANG_RELEASE
+  [ -f $GOLANG_DOWNLOAD ] || mv -n $GOLANG_DOWNLOAD $GOLANG_RELEASE
+  echo "Extracting $GOLANG_DOWNLOAD ..."
   tar -zxf $GOLANG_RELEASE || exit $?
   pushd go > /dev/null
   patch -p1 -r . < ../../gost/go.patch
@@ -38,8 +40,10 @@ if [ ! -e gost ]
 then
   GOST_RELEASE="gost_v${GOST_VERSION}.tar.gz"
   GOST_URL="https://github.com/go-gost/gost/archive/refs/tags/v${GOST_VERSION}.tar.gz"
-  echo "GOST was not detected, downloading '$GOST_RELEASE' ($GOST_URL) ..."
+  echo "GOST was not detected"
+  [ -f $GOST_RELEASE ] || echo "Downloading '$GOST_RELEASE' ($GOST_URL) ..."
   [ -f $GOST_RELEASE ] || curl $GOST_URL -Lo $GOST_RELEASE
+  echo "Extracting $GOST_RELEASE ..."
   tar -zxf $GOST_RELEASE || exit $?
   mv gost-* gost
 fi

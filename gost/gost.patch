@@ -10,7 +10,7 @@ index d3a5a42..4ea35a1 100644
  	xlogger "github.com/go-gost/x/logger"
  	"github.com/judwhite/go-svc"
  )
-@@ -72,6 +73,9 @@ func worker(id int, args []string, ctx *context.Context, ret *int) {
+@@ -78,6 +78,9 @@ func worker(id int, args []string, ctx *context.Context, ret *int) {
  func init() {
  	var printVersion bool
 
@@ -20,12 +20,12 @@ index d3a5a42..4ea35a1 100644
  	flag.Var(&services, "L", "service list")
  	flag.Var(&nodes, "F", "chain node list")
  	flag.StringVar(&cfgFile, "C", "", "configuration file")
-@@ -88,6 +91,8 @@ func init() {
+@@ -106,6 +91,8 @@ func init() {
  		os.Exit(0)
  	}
- 
 +	helper.PostInit()
 +
- 	logger.SetDefault(xlogger.NewLogger())
  }
  
+ func main() {
+ 	log := xlogger.NewLogger() 

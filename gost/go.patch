@@ -31,16 +31,16 @@ diff -ru go-back/src/net/dial.go go/src/net/dial.go
 diff -ru go-back/src/net/udpsock.go go/src/net/udpsock.go
 --- go-back/src/net/udpsock.go	2020-03-14 14:55:08.235708400 +0800
 +++ go/src/net/udpsock.go	2020-03-14 14:36:19.476741700 +0800
-@@ -219,6 +219,8 @@
+@@ -301,6 +301,8 @@
  	return c, nil
  }
  
 +var ListenUDPListenConfigHook func(d *ListenConfig)
 +
- // ListenUDP acts like ListenPacket for UDP networks.
+ // ListenUDP acts like [ListenPacket] for UDP networks.
  //
- // The network must be a UDP network name; see func Dial for details.
-@@ -238,6 +240,9 @@
+ // The network must be a UDP network name; see func [Dial] for details.
+@@ -320,6 +320,9 @@
  		laddr = &UDPAddr{}
  	}
  	sl := &sysListener{network: network, address: laddr.String()}
