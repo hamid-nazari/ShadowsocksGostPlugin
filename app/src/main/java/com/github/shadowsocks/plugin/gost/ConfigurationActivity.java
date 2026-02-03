@@ -2,10 +2,10 @@ package com.github.shadowsocks.plugin.gost;
 
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.ContextWrapper;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
@@ -25,12 +25,13 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
+import androidx.fragment.app.DialogFragment;
 
 import com.github.shadowsocks.plugin.PluginOptions;
 
-import org.apache.commons.lang3.function.FailableRunnable;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -49,17 +50,39 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Consumer;
 
 public class ConfigurationActivity extends com.github.shadowsocks.plugin.ConfigurationActivity {
+    private final String[] fileNameList = {
+            "config.yaml",
+            "cacert.pem",
+            "clientcert.pem",
+            "clientcertkey.pem",
+    };
+    private final int[] fileHintList = {
+            R.string.example_cfgjson,
+            R.string.example_cacert,
+            R.string.example_clientcert,
+            R.string.example_clientcertkey,
+    };
+    ActivityResultLauncher<Intent> loadFileLauncher;
     private LinearLayout linearlayout_cmdargs;
     private LinearLayout linearlayout_files;
     private Spinner argumentCountSpinner;
     private Editable newFileNameEditable;
-
     private Toast toast;
-
     private PluginOptions pluginOptions;
     private JSONObject decodedPluginOptions;
+    private AlertDialog configMigrationDialog;
+    private boolean onceAskedForConfigMigration = false;
+    private boolean onceAnsweredConfigMigrationPrompt = false;
+    private HashMap<Long, Editable[]> cmdArgMap;
+    private ArrayList<Long> cmdArgIdx;
+    private long cmdArgCtr = 0;
+    private HashMap<String, Editable> fileDataMap;
+    private String openingFileName = "";
+    private Thread readFileThread;
+    private Handler handler;
 
     @Override
     public void onSaveInstanceState(Bundle savedInstanceState) {
@@ -68,7 +91,7 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
             this.saveUI();
             savedInstanceState.putString("decodedPluginOptions", this.decodedPluginOptions.toString());
         } catch (JSONException e) {
-            e.printStackTrace();
+            Log.e("Configuration Activity", "Failed saving instance", e);
         }
         savedInstanceState.putBoolean("onceAskedForConfigMigration", this.onceAskedForConfigMigration);
         savedInstanceState.putBoolean("onceAnsweredConfigMigrationPrompt", this.onceAnsweredConfigMigrationPrompt);
@@ -92,7 +115,7 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
                 this.decodedPluginOptions = new JSONObject(json);
                 populateUI();
             } catch (JSONException e) {
-                e.printStackTrace();
+                Log.e("Configuration Activity", "Failed restroing instance", e);
             }
         }
         if (this.onceAskedForConfigMigration && !this.onceAnsweredConfigMigrationPrompt) {
@@ -104,13 +127,7 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
     private void showToast(int resID) {
         toast.cancel();
         toast.setText(resID);
-        // toast.show(); // unexpectedly not shown. workaround below
-        handler.post(new Runnable() {
-            @Override
-            public void run() {
-                toast.show();
-            }
-        });
+        handler.post(() -> toast.show());
     }
 
     @Override
@@ -154,7 +171,7 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
 
                 showToast(R.string.loaded_encoded_config);
             } catch (Exception e) {
-                e.printStackTrace();
+                Log.w("Configuration Activity", "Failed loading plugin configurations", e);
                 this.decodedPluginOptions = new JSONObject();
                 showToast(R.string.err_loading_encoded_config);
                 fallbackToManualEditor();
@@ -162,79 +179,66 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
         }
     }
 
-    private AlertDialog configMigrationDialog;
-    private boolean onceAskedForConfigMigration = false;
-    private boolean onceAnsweredConfigMigrationPrompt = false;
-
     private void promptConfigMigration() {
         onceAskedForConfigMigration = true;
         if (configMigrationDialog == null) {
             AlertDialog.Builder builder = new AlertDialog.Builder(this);
             builder.setTitle(R.string.prompt_config_mig_title);
             builder.setMessage(R.string.prompt_config_mig_msg);
-            builder.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    onceAnsweredConfigMigrationPrompt = true;
-                    // do migration
-                    try {
-                        // populate things to UI
-                        // and then they will be saved by saveUI() in onSaveInstanceState()
+            builder.setPositiveButton(R.string.ok, (dialog, which) -> {
+                onceAnsweredConfigMigrationPrompt = true;
+                // do migration
+                try {
+                    // populate things to UI
+                    // and then they will be saved by saveUI() in onSaveInstanceState()
 
-                        // populate original plugin options string to UI
-                        final String legacyCfg = replaceLegacyKeys(pluginOptions.toString());
+                    // populate original plugin options string to UI
+                    final String legacyCfg = replaceLegacyKeys(pluginOptions.toString());
 
-                        // populate command line arguments to UI
-                        ArrayList<String> substrings = new ArrayList<>();
-                        for (String s : legacyCfg.split(" ")) {
-                            if (s.length() == 0)
-                                continue;
-                            substrings.add(s);
-                        }
-                        for (int i = 0; i < substrings.size(); i++) {
-                            // "-L" should already be added
-                            boolean allowDelete = cmdArgIdx.size() > 0;
-                            String s = substrings.get(i);
-                            String next = null;
-                            if (i + 1 < substrings.size())
-                                next = substrings.get(i + 1);
-                            if (
-                                    s.matches("^-[A-Za-z0-1]$")
-                                            && next != null
-                                            && !next.matches("^-[A-Za-z0-1]$")
-                            ) {
-                                addCmdArg(s, next, allowDelete, false);
-                                i++;
-                            } else {
-                                addCmdArg("", s, allowDelete, true);
-                            }
-                        }
-
-                        toast.setText(R.string.config_mig_done);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        toast.setText(R.string.config_mig_err);
-                        fallbackToManualEditor();
+                    // populate command line arguments to UI
+                    ArrayList<String> substrings = new ArrayList<>();
+                    for (String s : legacyCfg.split(" ")) {
+                        if (s.isEmpty())
+                            continue;
+                        substrings.add(s);
                     }
-                }
-            });
-            builder.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    onceAnsweredConfigMigrationPrompt = true;
-                    toast.setText(R.string.cancelled);
+                    for (int i = 0; i < substrings.size(); i++) {
+                        // "-L" should already be added
+                        boolean allowDelete = !cmdArgIdx.isEmpty();
+                        String s = substrings.get(i);
+                        String next = null;
+                        if (i + 1 < substrings.size())
+                            next = substrings.get(i + 1);
+                        if (
+                                s.matches("^-[A-Za-z0-1]$")
+                                        && next != null
+                                        && !next.matches("^-[A-Za-z0-1]$")
+                        ) {
+                            addCmdArg(s, next, allowDelete, false);
+                            i++;
+                        } else {
+                            addCmdArg("", s, allowDelete, true);
+                        }
+                    }
+
+                    toast.setText(R.string.config_mig_done);
+                } catch (Exception e) {
+                    Log.w("Configuration Activity", "Failed while reading migrating configurations", e);
+                    toast.setText(R.string.config_mig_err);
                     fallbackToManualEditor();
                 }
             });
-            builder.setOnDismissListener(new DialogInterface.OnDismissListener() {
-                @Override
-                public void onDismiss(DialogInterface dialog) {
-                    if (!onceAnsweredConfigMigrationPrompt) {
-                        toast.cancel();
-                        configMigrationDialog.show(); // didn't click cancel button, so ask again
-                    } else {
-                        toast.show();
-                    }
+            builder.setNegativeButton(R.string.cancel, (dialog, which) -> {
+                onceAnsweredConfigMigrationPrompt = true;
+                toast.setText(R.string.cancelled);
+                fallbackToManualEditor();
+            });
+            builder.setOnDismissListener(dialog -> {
+                if (!onceAnsweredConfigMigrationPrompt) {
+                    toast.cancel();
+                    configMigrationDialog.show(); // didn't click cancel button, so ask again
+                } else {
+                    toast.show();
                 }
             });
             configMigrationDialog = builder.create();
@@ -243,19 +247,11 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
         configMigrationDialog.show();
     }
 
-
-    private HashMap<Long, Editable[]> cmdArgMap;
-    private ArrayList<Long> cmdArgIdx;
-    private long cmdArgCtr = 0;
-
-    private HashMap<String, Editable> fileDataMap;
-
     private void regenerateIDs(View v) {
         // regenerate new resIDs recursively for every children
         // otherwise later newly generated objects are "tied" to older one
         // like, after rotation change
-        if (v instanceof ViewGroup) {
-            ViewGroup vg = (ViewGroup) v;
+        if (v instanceof ViewGroup vg) {
             for (int i = 0; i < vg.getChildCount(); i++) {
                 regenerateIDs(vg.getChildAt(i));
             }
@@ -275,20 +271,15 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
                 msg.append("\"").append(e.toString()).append("\" ");
             }
             msg.deleteCharAt(msg.length() - 1);
-        } else Log.d("ConfigActivity", "confirmDelCmdArg cmdArgMap.get(currentIndex) == null");
+        } else
+            Log.d("Configuration Activity", "confirmDelCmdArg cmdArgMap.get(currentIndex) == null");
         builder.setMessage(msg.toString());
-        builder.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                cmdArgMap.remove(currentIndex);
-                cmdArgIdx.remove(currentIndex);
-                parent.removeView(child);
-            }
+        builder.setPositiveButton(R.string.ok, (dialog, which) -> {
+            cmdArgMap.remove(currentIndex);
+            cmdArgIdx.remove(currentIndex);
+            parent.removeView(child);
         });
-        builder.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-            }
+        builder.setNegativeButton(R.string.cancel, (dialog, which) -> {
         });
         builder.create().show();
     }
@@ -323,12 +314,7 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
         cmdArgMap.put(currentIndex, array);
         cmdArgIdx.add(currentIndex);
 
-        button_del.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                confirmDelCmdArg(currentIndex, child);
-            }
-        });
+        button_del.setOnClickListener(v -> confirmDelCmdArg(currentIndex, child));
 
         parent.addView(child);
     }
@@ -338,17 +324,11 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(R.string.confirm_del_file_title);
         builder.setMessage(getString(R.string.confirm_del_file_msg) + fileName);
-        builder.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                fileDataMap.remove(fileName);
-                parent.removeView(child);
-            }
+        builder.setPositiveButton(R.string.ok, (dialog, which) -> {
+            fileDataMap.remove(fileName);
+            parent.removeView(child);
         });
-        builder.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-            }
+        builder.setNegativeButton(R.string.cancel, (dialog, which) -> {
         });
         builder.create().show();
     }
@@ -372,28 +352,11 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
         }
         fileDataEditText.setHint(hint);
         fileDataEditText.setText(fileData);
-
         fileDataMap.put(fileName, fileDataEditText.getText());
-
-        button_load.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                readFromFile(fileName);
-            }
-        });
-
-        button_del_file.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                confirmDelFile(fileName, child);
-            }
-        });
-
+        button_load.setOnClickListener(v -> readFromFile(fileName));
+        button_del_file.setOnClickListener(v -> confirmDelFile(fileName, child));
         parent.addView(child);
     }
-
-    private static final int READ_FROM_FILE = 1;
-    private String openingFileName = "";
 
     private void readFromFile(String openingFileName) {
         if (readFileThread != null && readFileThread.isAlive()) {
@@ -411,63 +374,8 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
         else if (openingFileName.endsWith(".txt"))
             mimeType = "text/plain";
         intent.setType(mimeType);
-        startActivityForResult(intent, READ_FROM_FILE);
+        loadFileLauncher.launch(intent);
     }
-
-    private Thread readFileThread;
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        if (requestCode == READ_FROM_FILE) {
-            if (data != null) {
-                final Uri uri = data.getData();
-                final ContentResolver resolver = this.getContentResolver();
-                if (uri != null && (readFileThread == null || !readFileThread.isAlive())) {
-                    readFileThread = new Thread(() -> {
-                        try {
-                            StringBuilder stringBuilder = new StringBuilder();
-                            try (InputStream inputStream = resolver.openInputStream(uri);
-                                 BufferedReader reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(inputStream)));) {
-                                char[] buf = new char[4096];
-                                for (int r, t = 0; (r = reader.read(buf)) != -1; t += r) {
-                                    if (t > 1024 * 1024) {
-                                        showToast(R.string.err_file_too_large);
-                                        return;
-                                    }
-                                    stringBuilder.append(buf, 0, r);
-                                }
-                            }
-                            final String result = stringBuilder.toString();
-                            runOnUiThread(() -> {
-                                Editable editable = fileDataMap.get(openingFileName);
-                                if (editable != null) {
-                                    editable.clear();
-                                    editable.append(result);
-                                }
-                            });
-                        } catch (IOException ignored) {
-                        }
-                    });
-                    readFileThread.start();
-                } else Log.e("ConfigActivity", "readFileThread is unexpectedly alive");
-            }
-        } else {
-            super.onActivityResult(requestCode, resultCode, data);
-        }
-    }
-
-    private final String[] fileNameList = {
-            "config.yaml",
-            "cacert.pem",
-            "clientcert.pem",
-            "clientcertkey.pem",
-    };
-    private final int[] fileHintList = {
-            R.string.example_cfgjson,
-            R.string.example_cacert,
-            R.string.example_clientcert,
-            R.string.example_clientcertkey,
-    };
 
     private void saveUI() throws NullPointerException, JSONException {
         if (this.decodedPluginOptions == null)
@@ -478,7 +386,7 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
         for (Long index : cmdArgIdx) {
             Editable[] oneOrTwoArgsEditable = cmdArgMap.get(index);
             if (oneOrTwoArgsEditable == null) {
-                Log.e("ConfigActivity", "saveUI encountered oneOrTwoArgs == null");
+                Log.e("Configuration Activity", "saveUI encountered oneOrTwoArgs == null");
                 throw new NullPointerException();
             }
             JSONArray oneOrTwoArgs = new JSONArray();
@@ -510,7 +418,7 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
             dataDir = new File(dataDir.getAbsolutePath().replace(getPackageName(), referrer.getHost()));
         }
         if (!dataDir.exists() && referrer == null && !dataDir.mkdirs()) {
-            Log.e("ConfigActivity", "dataDir.mkdirs() failed");
+            Log.e("Configuration Activity", "dataDir.mkdirs() failed");
         }
         this.decodedPluginOptions.put("DataDir", dataDir.getAbsolutePath());
     }
@@ -529,7 +437,7 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
                 arg[j] = s;
             }
             // the first argument should be "-L", generally considered necessary
-            boolean allowDelete = this.cmdArgIdx.size() > 0;
+            boolean allowDelete = !this.cmdArgIdx.isEmpty();
             // sometimes it's more convenient to use only one edit box instead of two
             if (oneOrTwoArgs.length() == 1) {
                 this.addCmdArg("", arg[0], allowDelete, true);
@@ -574,15 +482,13 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
         }
     }
 
-    private Handler handler;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.config_activity);
 
         toast = Toast.makeText(this, "", Toast.LENGTH_SHORT);
-        handler = new Handler(); // workaround toast unexpectedly not showing problem
+        handler = new Handler(this.getMainLooper());
 
         cmdArgMap = new HashMap<>();
         cmdArgIdx = new ArrayList<>();
@@ -603,105 +509,110 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
         EditText editText_new_file_name = findViewById(R.id.editText_new_file_name);
         Button button_add_file = findViewById(R.id.button_add_file);
 
-        button_add.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                boolean hideFirstArg = argumentCountSpinner.getSelectedItemPosition() == 0;
-                String arg2 = hideFirstArg ? "" : getString(R.string.example_cmdarg4);
-                addCmdArg(getString(R.string.example_cmdarg3), arg2, true, hideFirstArg);
-            }
+        button_add.setOnClickListener(v -> {
+            boolean hideFirstArg = argumentCountSpinner.getSelectedItemPosition() == 0;
+            String arg2 = hideFirstArg ? "" : getString(R.string.example_cmdarg4);
+            addCmdArg(getString(R.string.example_cmdarg3), arg2, true, hideFirstArg);
         });
 
         this.newFileNameEditable = editText_new_file_name.getText();
-        button_add_file.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                String fileName = newFileNameEditable.toString();
-                if (fileName.length() == 0) {
-                    showToast(R.string.err_file_name_empty);
-                    return;
-                }
-                if (fileName.contains("/")) {
-                    showToast(R.string.err_file_name_contains_slash);
-                    return;
-                }
-                if (fileDataMap.containsKey(fileName)) {
-                    showToast(R.string.err_file_already_exists);
-                    return;
-                }
-                addFileEntry(fileName, "", "", true);
+        button_add_file.setOnClickListener(v -> {
+            String fileName = newFileNameEditable.toString();
+            if (fileName.isEmpty()) {
+                showToast(R.string.err_file_name_empty);
+                return;
             }
+            if (fileName.contains("/")) {
+                showToast(R.string.err_file_name_contains_slash);
+                return;
+            }
+            if (fileDataMap.containsKey(fileName)) {
+                showToast(R.string.err_file_already_exists);
+                return;
+            }
+            addFileEntry(fileName, "", "", true);
+        });
+
+        loadFileLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+            Intent data = result.getData();
+            if (data == null) {
+                Log.w("Configuration Activity", "File selection is cancelled for '" + this.openingFileName + "'");
+                return;
+            }
+            Uri uri = data.getData();
+            if (uri == null) {
+                Log.e("Configuration Activity", "No file is selected for for '" + this.openingFileName + "'");
+                return;
+            }
+            if (readFileThread != null && readFileThread.isAlive()) {
+                Log.e("Configuration Activity", "Previous reading file thread is unexpectedly alive");
+                return;
+            }
+            ContentResolver resolver = this.getContentResolver();
+            readFileThread = new Thread(() -> {
+                try {
+                    StringBuilder stringBuilder = new StringBuilder();
+                    try (InputStream inputStream = resolver.openInputStream(uri);
+                         BufferedReader reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(inputStream)))) {
+                        char[] buf = new char[4096];
+                        for (int r, t = 0; (r = reader.read(buf)) != -1; t += r) {
+                            if (t > 1024 * 1024) {
+                                showToast(R.string.err_file_too_large);
+                                return;
+                            }
+                            stringBuilder.append(buf, 0, r);
+                        }
+                    }
+                    String fileContent = stringBuilder.toString();
+                    runOnUiThread(() -> {
+                        Editable editable = fileDataMap.get(openingFileName);
+                        if (editable != null) {
+                            editable.clear();
+                            editable.append(fileContent);
+                        }
+                    });
+                } catch (IOException ignored) {
+                }
+            });
+            readFileThread.start();
         });
     }
 
     @Override
     public void onBackPressed() {
-        // ask for save & apply
-        String title = getString(R.string.confirm_save_apply_title);
-        String msg = getString(R.string.confirm_save_apply_msg);
-        String positiveButton = getString(R.string.ok);
-        String negativeButton = getString(R.string.discard_changes);
-        FailableRunnable<Exception> positive = () -> {
-            saveUI();
-
-            pluginOptions.clear(); // discard keys other than encoded config
-            pluginOptions.put(getString(R.string.cfg_po_encoded), Base64.getEncoder().withoutPadding().encodeToString(decodedPluginOptions.toString().getBytes(StandardCharsets.UTF_8)));
-            saveChanges(pluginOptions);
-            finish();
-        };
-        Runnable negative = this::finish;
-        String toastMsgOnSuccess = getString(R.string.saved_encoded_config);
-        String toastMsgOnFail = getString(R.string.error_saving_encoded_config);
-        String toastMsgOnCancel = getString(R.string.cancelled);
-        askForConsent(title, msg, positiveButton, negativeButton, positive, negative, toastMsgOnSuccess, toastMsgOnFail, toastMsgOnCancel);
+        ensureSaveContents();
     }
 
-    private boolean dismissedConsent = false;
+    private void saveAllChanges() throws JSONException {
+        saveUI();
+        pluginOptions.clear(); // discard keys other than encoded config
+        pluginOptions.put(getString(R.string.cfg_po_encoded), Base64.getEncoder().withoutPadding().encodeToString(decodedPluginOptions.toString().getBytes(StandardCharsets.UTF_8)));
+        saveChanges(pluginOptions);
+        finish();
+    }
 
-    private void askForConsent(
-
-            String title, String msg,
-            String positiveButton, String negativeButton,
-            final FailableRunnable<Exception> positive, final Runnable negative,
-            final String toastMsgOnSuccess, final String toastMsgOnFail, final String toastMsgOnCancel) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle(title);
-        builder.setMessage(msg);
-        builder.setPositiveButton(positiveButton, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                dismissedConsent = false;
-                try {
-                    positive.run();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    toast.setText(toastMsgOnFail);
-                    return;
-                }
-                toast.setText(toastMsgOnSuccess);
+    private void ensureSaveContents() {
+        SaveChangesDialogFragment dialog = new SaveChangesDialogFragment(() -> {
+            try {
+                saveAllChanges();
+            } catch (Exception e) {
+                Log.w("Configuration Activity", "Failed while saving plugin configurations", e);
+                showToast(R.string.error_saving_encoded_config);
+                return;
             }
+            ConfigurationActivity.super.onBackPressed();
+            showToast(R.string.saved_encoded_config);
+            super.onBackPressed();
+        }, () -> {
+            finish();
+            ConfigurationActivity.super.onBackPressed();
+            showToast(R.string.cancelled);
+            super.onBackPressed();
+        }, dismissed -> {
+            if (dismissed)
+                showToast(R.string.cancelled);
         });
-        builder.setNegativeButton(negativeButton, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                dismissedConsent = false;
-                negative.run();
-                toast.setText(toastMsgOnCancel);
-            }
-        });
-        builder.setOnDismissListener(new DialogInterface.OnDismissListener() {
-            @Override
-            public void onDismiss(DialogInterface dialog) {
-                if (dismissedConsent)
-                    toast.setText(toastMsgOnCancel);
-                toast.show();
-            }
-        });
-        AlertDialog consentDialog = builder.create();
-
-        toast.cancel();
-        dismissedConsent = true;
-        consentDialog.show();
+        dialog.show(getSupportFragmentManager(), "SAVE_DIALOG");
     }
 
     private String replaceLegacyKeys(String pluginOptions) {
@@ -714,6 +625,47 @@ public class ConfigurationActivity extends com.github.shadowsocks.plugin.Configu
         pluginOptions = pluginOptions.replaceAll("#SS_REMOTE_HOST", "\\$\\{" + getString(R.string.cfg_key_remote_host) + "\\}");
         pluginOptions = pluginOptions.replaceAll("#SS_REMOTE_PORT", "\\$\\{" + getString(R.string.cfg_key_remote_port) + "\\}");
         return pluginOptions;
+    }
+
+    public static class SaveChangesDialogFragment extends DialogFragment {
+        public String title;
+        public String msg;
+        public String positiveButton;
+        public String negativeButton;
+        public Runnable onPositive;
+        public Runnable onNegative;
+        public Consumer<Boolean> onDismissed;
+        protected boolean dismissedConsent = false;
+
+        public SaveChangesDialogFragment(Runnable onPositive, Runnable onNegative, Consumer<Boolean> onDismiss) {
+            this.onPositive = onPositive;
+            this.onNegative = onNegative;
+            this.onDismissed = onDismiss;
+        }
+
+        protected void prepare() {
+            title = getString(R.string.confirm_save_apply_title);
+            msg = getString(R.string.confirm_save_apply_msg);
+            positiveButton = getString(R.string.ok);
+            negativeButton = getString(R.string.discard_changes);
+            dismissedConsent = true;
+        }
+
+        @NonNull
+        @Override
+        public Dialog onCreateDialog(Bundle savedInstanceState) {
+            prepare();
+            return new AlertDialog.Builder(getActivity())
+                    .setTitle(title)
+                    .setMessage(msg)
+                    .setPositiveButton(positiveButton, (dialog, which) -> {
+                        dismissedConsent = false;
+                        onPositive.run();
+                    }).setNegativeButton(negativeButton, (dialog, which) -> {
+                        dismissedConsent = false;
+                        onNegative.run();
+                    }).setOnDismissListener(dialog -> onDismissed.accept(this.dismissedConsent)).create();
+        }
     }
 
 }

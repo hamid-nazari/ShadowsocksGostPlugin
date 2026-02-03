@@ -1,7 +1,7 @@
 #!/bin/bash
 
-[ -z "$GOLANG_VERSION" ] && GOLANG_VERSION="1.25.0"
-[ -z "$GOST_VERSION" ] && GOST_VERSION="3.2.4"
+[ -z "$GOLANG_VERSION" ] && GOLANG_VERSION="1.24.5"
+[ -z "$GOST_VERSION" ] && GOST_VERSION="3.2.6"
 [ -z "$ANDROID_NDK_ROOT" ] && NDK_VERSION="r26c"
 
 set -e
@@ -28,7 +28,7 @@ then
   echo "Extracting $GOLANG_DOWNLOAD ..."
   tar -zxf $GOLANG_RELEASE || exit $?
   pushd go > /dev/null
-  patch -p1 -r . < ../../gost/go.patch
+  patch -p1 -r . -i ../../gost/go.patch
   popd > /dev/null
 fi
 
@@ -53,7 +53,7 @@ latest_gost_release_mod=$(find "gost" -mindepth 1 -type f -printf '%T@\n' | sort
 if [[ !(-d "gost/gost_helper") || ( $latest_local_mod > $latest_gost_release_mod ) ]] 
 then
   pushd gost > /dev/null
-  patch --no-backup-if-mismatch -tlNp1 -r /tmp/rejects.txt < ../../gost/gost.patch || echo "GOST patching failed (already patched?)"
+  patch --no-backup-if-mismatch -tlNp1 -r /tmp/rejects.txt -i ../../gost/gost.patch || echo "GOST patching failed (already patched?)"
   cp -r ../../gost/gost_helper .
   echo " + GOST patched"
   popd > /dev/null
@@ -96,37 +96,59 @@ echo " + Started: $(date)"
 
 start=$SECONDS
 
-output="../../app/src/main/jniLibs/armeabi-v7a/libgost-plugin.so";
-GOARCH_="arm"
-CC_=$(find $ANDROID_NDK_ROOT -iname "*armv7a-linux-androideabi21-clang" -print -quit);
-[[ ! -z "$CC_" && (! -f $output || $(stat -c %Y $output) < $latest_mod) ]] \
-|| (echo " + Skipping build for '$GOARCH_'" && exit 1) \
-&& echo " + Building for '$GOARCH_' ..." \
-&& CC=$CC_ GOOS="android" GOARCH=$GOARCH_ CGO_ENABLED="1" go build -buildvcs=false -ldflags "-s -w" -a -o $output $src;
+jnifolder="../../app/src/main/jniLibs"
+buildfolder="../libgost"
+echo " + Build folder: $(realpath $buildfolder)"
+echo " + App JNI libs folder: $(realpath $jnifolder)"
+[[ -d $jnifolder ]] && rm -fr "$jnifolder/*" && echo "   o Cleared"
 
-output="../../app/src/main/jniLibs/arm64-v8a/libgost-plugin.so";
-GOARCH_="arm64"
-CC_=$(find $ANDROID_NDK_ROOT -iname "*aarch64-linux-android21-clang" -print -quit);
-[[ ! -z "$CC_" && (! -f $output || $(stat -c %Y $output) < $latest_mod) ]] \
-|| (echo " + Skipping build for '$GOARCH_'" && exit 1) \
-&& echo " + Building for '$GOARCH_' ..." \
-&& CC=$CC_ GOOS="android" GOARCH=$GOARCH_ CGO_ENABLED="1" go build -buildvcs=false -ldflags "-s -w" -a -o $output $src;
+# artifact="armeabi-v7a/libgost-plugin.so";
+# output="$buildfolder/$artifact";
+# GOARCH_="arm"
+# CC_=$(find $ANDROID_NDK_ROOT -iname "*armv7a-linux-androideabi21-clang" -print -quit);
+# [[ ! -z "$CC_" && (! -f $output || $(stat -c %Y $output) < $latest_mod) ]] \
+# || (echo " + Skipping build for '$GOARCH_' ($artifact)" && exit 1) \
+# && echo " + Building for '$GOARCH_' ($artifact) ..." \
+# && CC=$CC_ GOOS="android" GOARCH=$GOARCH_ CGO_ENABLED="1" go build -buildvcs=false -ldflags "-s -w" -a -o $output $src;
+# target="$jnifolder/$artifact"
+# mkdir -p "$(dirname $target)"
+# cp -f $output $target
 
-output="../../app/src/main/jniLibs/x86/libgost-plugin.so";
+# artifact="arm64-v8a/libgost-plugin.so";
+# output="$buildfolder/$artifact";
+# GOARCH_="arm64"
+# CC_=$(find $ANDROID_NDK_ROOT -iname "*aarch64-linux-android21-clang" -print -quit);
+# [[ ! -z "$CC_" && (! -f $output || $(stat -c %Y $output) < $latest_mod) ]] \
+# || (echo " + Skipping build for '$GOARCH_' ($artifact)" && exit 1) \
+# && echo " + Building for '$GOARCH_' ($artifact) ..." \
+# && CC=$CC_ GOOS="android" GOARCH=$GOARCH_ CGO_ENABLED="1" go build -buildvcs=false -ldflags "-s -w" -a -o $output $src;
+# target="$jnifolder/$artifact"
+# mkdir -p "$(dirname $target)"
+# cp -f $output $target
+
+artifact="x86/libgost-plugin.so";
+output="$buildfolder/$artifact";
 GOARCH_="386"
 CC_=$(find $ANDROID_NDK_ROOT -iname "*i686-linux-android21-clang" -print -quit);
 [[ ! -z "$CC_" && (! -f $output || $(stat -c %Y $output) < $latest_mod) ]] \
-|| (echo " + Skipping build for '$GOARCH_'" && exit 1) \
-&& echo " + Building for '$GOARCH_' ..." \
+|| (echo " + Skipping build for '$GOARCH_' ($artifact)" && exit 1) \
+&& echo " + Building for '$GOARCH_' ($artifact) ..." \
 && CC=$CC_ GOOS="android" GOARCH=$GOARCH_ CGO_ENABLED="1" go build -buildvcs=false -ldflags "-s -w" -a -o $output $src;
+target="$jnifolder/$artifact"
+mkdir -p "$(dirname $target)"
+cp -f $output $target
 
-output="../../app/src/main/jniLibs/x86_64/libgost-plugin.so";
-GOARCH_="amd64"
-CC_=$(find $ANDROID_NDK_ROOT -iname "*x86_64-linux-android21-clang" -print -quit);
-[[ ! -z "$CC_" && (! -f $output || $(stat -c %Y $output) < $latest_mod) ]] \
-|| (echo " + Skipping build for '$GOARCH_'" && exit 1) \
-&& echo " + Building for '$GOARCH_' ..." \
-&& CC=$CC_ GOOS="android" GOARCH=$GOARCH_ CGO_ENABLED="1" go build -buildvcs=false -ldflags "-s -w" -a -o $output $src;
+# artifact="x86_64/libgost-plugin.so";
+# output="$buildfolder/$artifact";
+# GOARCH_="amd64"
+# CC_=$(find $ANDROID_NDK_ROOT -iname "*x86_64-linux-android21-clang" -print -quit);
+# [[ ! -z "$CC_" && (! -f $output || $(stat -c %Y $output) < $latest_mod) ]] \
+# || (echo " + Skipping build for '$GOARCH_' ($artifact)" && exit 1) \
+# && echo " + Building for '$GOARCH_' ($artifact) ..." \
+# && CC=$CC_ GOOS="android" GOARCH=$GOARCH_ CGO_ENABLED="1" go build -buildvcs=false -ldflags "-s -w" -a -o $output $src;
+# target="$jnifolder/$artifact"
+# mkdir -p "$(dirname $target)"
+# cp -f $output $target
 
 duration=$(( $SECONDS - $start ))
 echo " + Finished: $(date) [Took $duration seconds]"

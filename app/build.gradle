@@ -2,21 +2,22 @@ import org.apache.tools.ant.taskdefs.condition.Os
 
 plugins {
     id 'com.android.application'
+    id 'org.jetbrains.kotlin.android' version '2.3.0' apply false
 }
 
 Properties properties = new Properties()
 properties.load(project.rootProject.file('local.properties').newDataInputStream())
 
 android {
-    compileSdk 29
+    compileSdk 36
     namespace "com.github.shadowsocks.plugin.gost"
     defaultConfig {
         applicationId "${android.namespace}"
         minSdk 26
         //noinspection ExpiredTargetSdkVersion
         targetSdk 29
-        versionCode 422000
-        versionName "4.2.2"
+        versionCode 423000
+        versionName "4.2.3"
         manifestPlaceholders = [pluginID: "gost"]
         setProperty("archivesBaseName", "ShadowsocksGOSTPlugin-$versionName")
     }
@@ -25,7 +26,7 @@ android {
             keyAlias properties.getProperty("SignKeyName")
             keyPassword properties.getProperty("SignKeyPass")
             storePassword properties.getProperty("SignKeyPass")
-            storeFile file(System.getProperty("user.home") + "/"+properties.getProperty("SignKeyStorePath"))
+            storeFile file(System.getProperty("user.home") + "/" + properties.getProperty("SignKeyStorePath"))
         }
     }
     buildTypes {
@@ -39,36 +40,52 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
-    
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging true
+        }
+    }
+
     android.ndkVersion "26.2.11394342"
 }
 
 dependencies {
     implementation 'com.github.shadowsocks:plugin:2.0.1'
+    // Unless com.github.shadowsocks gets updated, do not bother updating these next 2 since that plugin brings in Java8 classes that conflict with those in new plugins and hell breaks loose on your soul!
     implementation 'androidx.appcompat:appcompat:1.3.1'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-    implementation 'org.apache.commons:commons-lang3:3.12.0'
+    implementation 'org.apache.commons:commons-lang3:3.20.0'
 }
 
-task buildGoLibrary(type: Exec) {
-    if(Os.isFamily(Os.FAMILY_WINDOWS))
-    {
-        commandLine ('cmd')
-        return
+tasks.register('copyGoLibrary') {
+    copy {
+        from "../.go_build/libgost"
+        into "${project.projectDir}/src/main/jniLibs"
     }
-    environment ([ANDROID_NDK_ROOT: android.ndkDirectory])
-    commandLine ('../build.gost.sh')
+}
+
+tasks.register('buildGoLibrary', Exec) {
+    environment([ANDROID_NDK_ROOT: android.ndkDirectory])
+    commandLine('../build.gost.sh')
     inputs.files '../build.gost.sh'
     outputs.dir 'src/main/jniLibs'
 }
 
 clean {
-     delete "${project.projectDir}/src/main/jniLibs"
+    delete "${project.projectDir}/src/main/jniLibs"
 }
 
-tasks.whenTaskAdded { theTask ->
-    if (theTask.name.equals("preDebugBuild") || theTask.name.equals("preReleaseBuild")) {
-        theTask.dependsOn "buildGoLibrary"
+tasks.configureEach { theTask ->
+    if (theTask.name == "preDebugBuild" || theTask.name == "preReleaseBuild") {
+        if (Os.isFamily(Os.FAMILY_WINDOWS))
+            theTask.dependsOn "copyGoLibrary"
+        else
+            theTask.dependsOn "buildGoLibrary"
     }
 }
 

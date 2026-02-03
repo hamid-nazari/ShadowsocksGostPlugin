@@ -10,7 +10,7 @@
         <item>添加 2 个参数</item>
     </string-array>
     <string name="string_text_file_entries">附加文件</string>
-    <string name="string_text_desc">请不要在命令行参数中加入双引号(\")，加了会让GOST无法启动。\n\"${remote.host}\"与\"${remote.port}\"将会被分别替换为Shadowsocks-Android中设置的\"服务器\"与\"远程端口\"。</string>
+    <string name="string_text_desc"><i>Shadowsocks-Android</i> 连接到位于 <b>${local.host}:${local:port}</b> 的 <i>本地 Shadowsocks 服务器</i>，该服务器必须由 <i>GOST</i> 配置。此服务通常通过第一个 <b>-L</b> 参数指定。后续转发节点（即 <b>-F</b> 参数）和其他 <i>GOST</i> 相关的命令行参数应由用户通过下方提供的控件按顺序指定。您可以在参数值中引用 <b>${remote.host}</b> 和 <b>${remote.port}</b>，它们将分别替换为配置的 <b>服务器</b> 和 <b>远程端口</b>。为避免不必要的性能损失，默认情况下不使用加密，因此，在 <i>Shadowsocks-Android</i> 配置文件设置中，<b>加密方法</b> 必须设置为 <b>无</b> 才能进行默认设置。您需要重启相应的配置文件才能使更改生效。</string>
     <string name="string_text_files_reminder">必须添加对应的命令行参数（例如： -C config.yaml）才能让下面的文件内容生效！</string>
     <string name="string_delete">删除</string>
     <string name="confirm_del_file_title">删除单个文件</string>
